@@ -1,5 +1,7 @@
 # Google Cloud Programming - Challenge labs
 
+https://google.qwiklabs.com/focuses/10258?parent=catalog
+
 ## Task 1: Create a project jumphost instance
 
 Create a `Compute Engine` (virtual machine) with a limited machine-type.
