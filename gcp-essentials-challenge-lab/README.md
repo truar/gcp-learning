@@ -69,10 +69,13 @@ gcloud compute instance-templates create nucleus-template \
      --machine-type=f1-micro \
      --metadata-from-file startup-script=startup.sh
 ```
+- 1 instance template
  3. Create a `Target Pool` to have a single entry point into the future `Instance group`
 ```
 gcloud compute target-pools create nucleus-pool
 ```
+- 1 loadBalancing (no frontend nor backend)
+
  4. Create the `Instance group` connected to the `Target pool` previously created. 2 compute engines must be created.
  The goal of the `Instance group` is to keep align the compute engines.
 ```
@@ -82,29 +85,37 @@ gcloud compute instance-groups managed create nucleus-group \
          --template nucleus-template \
          --target-pool nucleus-pool
 ```
+- 1 instance group
+- 2 compute engines
+- Update the pool with 2 backends, but no health check is configured, so traffic will be redirected, no matter of status
  5. Create a firewall rule to allow HTTP 80 traffic.<br/>
  Why not using the `Instance template` and use the option `Allow HTTP traffic` ? What is the difference ?
 ```
 gcloud compute firewall-rules create www-firewall --allow tcp:80
 ```
-
+- 1 firewall rule for HTTP 80
 ### Create the HTTP LoadBalancer
  1. To make sure the LoadBalancing will not hit a failed server, create a `Http Health Check`
 ``` 
 gcloud compute http-health-checks create http-basic-check
 ```
- 2. Make the `Health check` checking the `Instance group` on port 80
+- 1 health check
+
+ 2. I don't know exactly what this one is doing
 ```
 gcloud compute instance-groups managed \
        set-named-ports nucleus-group \
        --named-ports http:80
 ```
+- ???
  3. Create a `Backend service` server that will use the `Health Check` to know when a server in not responding, 
  and not Load balancing the request to it.
 ```
 gcloud compute backend-services create nucleus-backend \
       --protocol HTTP --http-health-checks http-basic-check --global
 ```
+- 1 backend in LoadBalancing table and connected to the health check
+
  4. The `Backend server` is connected to the `Instance group` to forward the HTTP request to it.
 ```
 gcloud compute backend-services add-backend nucleus-backend \
@@ -112,17 +123,21 @@ gcloud compute backend-services add-backend nucleus-backend \
     --instance-group-zone us-east1-b \
     --global
 ``` 
+- Connect the backend to the instance group
+
  5. Create a `Url Map` to redirect the request onto the proper `Backend server` depending on the endpoint requested.
  In this case, there is no special rule, so every incoming request will be forwarded to `nucleus-backend`.
 ```
 gcloud compute url-maps create web-map \
     --default-service nucleus-backend
 ```
+- 1 loadbalancing named web-map
  6. Create a `Proxy` that will intercept the request and then call the `Url Map`. This a HTTP proxy.
 ```
 gcloud compute target-http-proxies create http-lb-proxy \
     --url-map web-map
 ```
+- 1 proxy in target proxies
  7. Make the proxy forwarding the HTTP request on port 80
 ```
 gcloud compute forwarding-rules create http-content-rule \
@@ -130,6 +145,7 @@ gcloud compute forwarding-rules create http-content-rule \
         --target-http-proxy http-lb-proxy \
         --ports 80
 ```
+- 1 frontend
  8. Retrieve the IP to access your application
 ```
 gcloud compute forwarding-rules list
