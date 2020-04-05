@@ -933,9 +933,9 @@ To achieve replications, it uses a combinaison of :
 Very similar to a relational schema, you can choose to use a foreign key or nested tables, to group table physically in the same cluster, increasing your performance 
 
 Use the console to:
-* create the instance: choose mutliregional (expensive) or regional (cheaper), the name, number of nodes.
+* create the instance: choose multiregional (expensive) or regional (cheaper), the name, number of nodes.
 * create The tables: use a SQL query to create a schema
-* insert/update/delete datas inside the table
+* insert/update/delete data inside the table
 * Remove tables and instances
 Straightforward, nothing complicated.
 
@@ -1232,22 +1232,142 @@ To delete it:
 gcloud deployment-manager deployments delete quickstart-deployment
 ```
 
-
 Best practices: Use python for template. Create template to get unit of deployment.
 
+The `deployment-manager/more-complex-example` does more than the basic:
+* Creates a load-balanced application with:
+* A MySQL as a backend server, container, on a compute instance
+* A NodeJS app, with a template, a instance group of size 2 and max scale of 20.
+* A forwardrule, health check and target pool (nothing I never saw before)
+
+To deploy it, do :
+```
+cd deployment-manager/more-complex-example/nodejs
+gcloud deployment-manager deployments create more-complex-example --config nodejs.yaml
+gcloud deployment-manager deployments delete more-complex-example --config nodejs.yaml
+```
+
+This is a really DevOps oriented tool. When you need to reproduce easily your environment. Clearly, it is an IaaC.
+Great to keep all environment/projects lined up.
+
+For CloudCMR, could be used for :
+- Creating the database (Firestore)
+- But, for appEngine, don't think it is useful.
 
 # 4. Ensuring successful operation of a cloud solution
 
 ## 4.1 Managing Compute Engine resources. Tasks include:
 
 ### Managing a single VM instance (e.g., start, stop, edit configuration, or delete an instance)
+Use `gcloud compute instances create my-instance-name`
 ### SSH/RDP to the instance
+ssh the external IP, or, use the console and click on `SSH`
 ### Attaching a GPU to a new instance and installing CUDA libraries
+
 ### Viewing current running VM inventory (instance IDs, details)
+`gcloud compute instances describe my-instance-name`
+Or click on the instance name in the console.
 ### Working with snapshots (e.g., create a snapshot from a VM, view snapshots, delete a snapshot)
+Snapshots are a backup of your persistent storage disk to ensure you can restore your data in case of a crash.
+You can schedule snapshots to make sure your is saved at regular interval. 
+The first snapshot is full and copy the entire disk. The other ones are smaller, as they only store the difference between the previous snaphshot and the current disk state.
+
+Some snapshots best practices:
+* Flush the data to the disk before taking a snapshot. Make sure everything is written, and then stop your app.
+* Or, freeze or unmount the disk, to make sure the snapshot is reliable.
+* Choose a snapshot time during off-peak period, to avoid latency on your apps
+* If you often need to create an instance from a snapshot, make an image out of the snapshot, and use this image to create instance. 
+This reduces the cost of network.
+* If you don't need to save all your data, then create different disks and mount them. This way, you can reduce the size of your
+snapshot if you need only to save a subsequent part of your data.
+
+To daily saved a disk, create a daily schedule snapshots, then go to your disk configuration page, and attach the schedule snapshot to it.
+
+You can create an image out of a snapshot, and use it to create new instances. to select your newly created images, create an instance,
+and change the image (default is debian), to a new `custom image` and find the one you created. Be careful of the region (I guess). you could not find your image
+if you are deploying an instance into a different region.
+
+Schedule snapshots can be :
+* hourly, daily or weekly.
+* With a retention policy (default 14 days). It indicated the number of days you want to keep your snapshots before deleting them.
+* Regional or multi-regional. a snapshot can be limited to a region, coming from an other one, but keep in mind the network cost when doing so.
+
+When deleting a snapshot, the data contained in this snapshot are transferred to next one. It is a linked list of snapshot basically.
 ### Working with images (e.g., create an image from a VM or a snapshot, view images, delete an image)
+In the console > Compute Engines > Images
+In this page, you see all the available images you have in your project, and the default ones provided by gcp.
+
+To create an image, click `Create an image`, then select :
+* the name
+* the source:
+    * a disk: a disk created by one of your compute engine for instance, or one you created yourself.
+    * a snapshot: when you saved one of your disk, choose a snapshot to create a new image
+    * an image: create an image from another image
+    * Cloud storage file : a file stored in your buckets
+    * Virtual disk : A VMDK or other virtual instance (VHD) (require special roles: compute.admin & iam.serviceAccountUser)
+    
+In the main page, you can also delete the image you don't want to use anymore (not the default one).
+
+You can also start the creation of an instance in this page. It just fill the main instance form page with he image you selected.
+
 ### Working with instance groups (e.g., set autoscaling parameters, assign instance template, create an instance template, remove instance group)
+#### Managed instance group
+An managed instance group is useful the manage a set of instance as a logical cluster, working together to achieve a functionality.
+
+It is mandatory to create your instances the same way if you want a managed cluster instance. You need to have created an `instance template` to
+make sure you create your instances the same way (for instance, with a http server, or postgresql database).
+
+An instance template can be created using the `gcloud` but also the `console`.
+An instance template specify almost everything like the instance creation):
+* the machine type (f1-micro, n1-standard)
+* The CPU and GPU if needed
+* the boot device (with the image)
+* the account service logged into the instance
+* and among other optional things, you can either:
+    * Past a shell content to install your instance at the creation: startup-script="#!/bin/sh..."
+    * Past the link to a shell file (using the console, the file must be on the internet accessible, like a google bucket, or using the gcloud cli, the file can be on your fs)
+    * console= startup-script-url=gs://BUCKET_URL
+    
+Then, if you want to create a manage group, go in the console, and create `New managed instance group`.
+You will need to have created your template first.
+
+Choose some configurations, like :
+* the zone (classic). Is it a multiple zone or a single zone cluster ? (please note that the cluster needs to be in the same region at least)
+* the instance template
+* The autoscaling configuration. You can disable the autoscale, enable it always up (always more instances, but never less), or fully managed.
+The autoscaling is based is based on some criteria:
+    * CPU Utilization. At a threshold, create new VM
+    * HTTP Traffic : increase instance of the HTTP traffic is to high (in percentage of its capacity)
+    * Stackdriver monitoring metrics : A special metric in your stackdriver interface that will indicate when it is the best moment to autoscale your instances.
+* Note that you can create multiple metrics. In case of high traffic with low CPU, you won't always autoscale, but your clients might by waiting for responses from your VM.
+* Create or use an health check to have a loadbalancer avoiding not responding server
+
+#### Unmanaged instance group
+You can create also an unmanaged instance group to group VMs that doesn't need to share the same configuration.
+Given the circumstances, it is possible, but prefer a managed instance group when possible.
+You create a unmanaged instance group only after you have instance created. 
+
 ### Working with management interfaces (e.g., Cloud Console, Cloud Shell, GCloud SDK)
+```
+gcloud compute instances COMMAND : manage the instances
+gcloud compute instance-groups COMMAND : manage the instance groups
+```
+`gcloud compute` can manage google resources :
+* instances
+* instances-groups
+* images
+* disks
+* heath-check (special command for http(s)-health-check)
+* templates
+* networks
+* regions
+* snapshots
+* load-balancer
+
+But also execute actions like :
+* connects SSH to a engine
+
+Even if it is a single interface for `gcloud`, those resources are splitted across many console pages.
 
 ## 4.2 Managing Google Kubernetes Engine resources. Tasks include:
 
@@ -1262,8 +1382,94 @@ Best practices: Use python for template. Create template to get unit of deployme
 ## 4.3 Managing App Engine and Cloud Run resources. Tasks include:
 
 ### Adjusting application traffic splitting parameters
+#### App engine
+When using App Engine, you can split traffic across multiple versions of the same service using the console.
+Deploy your application with maven or gradle plugin to enhance your deployment.
+
+With the maven plugin, the traffic is automatically migrated to the new versions.
+
+You can split traffic depending on the :
+* client IP
+* a cookie named "GOOGAPPUID"
+* Random assignment
+
+#### Cloud Run
+As App engine, a Cloud Run service can split traffic across multiple versions. But there is less options. We can't choose (with the console)
+on which criterias to split, unlike app engine.
+
 ### Setting scaling parameters for autoscaling instances
+
+#### App engine
+To manage the autoscaling parameters, add parameters to the appengine/app.yml with the parameters :
+```yaml
+automatic_scaling:
+    max_instances:
+    min_instances:
+    min_idle_instances:
+    max_idle_instances:
+    # And others
+    
+    # To configure the autoscaling parameters:
+    target_cpu_utilization:
+    target_throughput_utilization:
+    max_concurrent_requests: 
+```
+
+To see all possibilites: https://cloud.google.com/appengine/docs/standard/java11/config/appref
+You can combine `target_throughput_utilization` with `max_concurrent_requests` to start new instances given a number of requests
+
+You can also set a basic or manual scaling, if you want to build application based on things in memory, otherwise, don't.
+
+#### Cloud Run
+##### Fully managed
+When creating a cloud run service, the Console interface provides an advanced settings in which you can configure:
+* the container Port
+* the container execution command
+* The RAM (128M to 2G, or even more)
+* The CPU (1 or 2)
+* A request timeout 
+
+On autoscaling, it seems that the configuration is limited to the number of requests per container instance. App engine seemed to have more configuration
+for autoscaling (like CPU, or requests).
+
+But it is more than enough.
+
+You can also restrict the number of maximum instance for a service, but the minimum is set to 0.
+
+I hadn't check every possibilities for app engine, but I guess that's pretty much the same.
+
+Cloud Runs gives less information. It is like a small environment in GCP, as it has its own reporting, dashboard, you can't directly see the running instances, you can see them
+with the dashboard
+
+This configuration is very basic, and can leverage developer deployment. But is limited if you need more configuration.
+
+##### Anthos (and kubernetes)
+You need to have an anthos cluster started to manage your cloud runs in this cluster.
+
 ### Working with management interfaces (e.g., Cloud Console, Cloud Shell, Cloud SDK)
+#### App Engine
+App engine is linked to the stackdriver resources. You can access logs and others resources information, like CPU, incoming requests...
+Every log of your applications are redirected to the console, which is catch by the stackdriver.
+You can also create uptime check and alert
+
+Be careful with app engine, without configuring the max autoscaling parameters, you can quickly loose control of your instances, and so the cost.
+
+```
+gcloud app instances list
+gcloud app versions list
+gcloud app browse --service="querkus-hello"
+gcloud app create
+gcloud app deploy ./to/app.yml
+```
+
+#### Cloud Runs
+
+```
+gcloud run deploy <service-name> --image <image_name>
+gcloud run revisions list --region=europe-west1 --platform=managed
+```
+
+Very easy to manage through the console. I guess must be the same through the `gcloud` CLI.
 
 ## 4.4 Managing storage and database solutions. Tasks include:
 
