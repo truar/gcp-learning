@@ -2,9 +2,9 @@
 
 ## GCP
 
-Cloud shell offers 5Gb of persistent storage to the users, wiht pre install cloud SDK
+Cloud shell offers 5Gb of persistent storage to the users, with pre install cloud SDK
 
-## Projets
+## Projects
 Shutdown project are scheduled to be deleted after 30 days when the user asks for
 
 4 ways to interact with GCP :
@@ -45,14 +45,14 @@ Subnet:
 * has 4 reserved IP addresses in its primary range
 * A single firewall rule can be applied to both VM
 
-Increase IP addresse space without downtime
+Increase IP address space without downtime
 
-No overlap
-Subnet can be of different size
-RFC 1918 address spaces
-You can't undo an expansion
-Avoid large subnet
-Do not scale subnet beyond what we actually need
+* No overlap
+* Subnet can be of different size
+* RFC 1918 address spaces
+* You can't undo an expansion
+* Avoid large subnet
+* Do not scale subnet beyond what we actually need
 
 If the subnet does not have any IP Addresses left, you can't create compute engine. You must expand your subnet (go in the subnet edit panel in GCP)
 
@@ -71,7 +71,7 @@ Every VM has 2 IP:
 
 ## IP mapping
 
-External is mapped to internal address transparently by VPC. Each instance has a host name that can be resolved to an internal IP address.
+External IP is mapped to internal address transparently by VPC. Each instance has a host name that can be resolved to an internal IP address.
 
 Hostname = instance name. `hostname -f`
 

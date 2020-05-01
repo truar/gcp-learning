@@ -220,7 +220,7 @@ If you need extra speed, use dedicated interconnect.
 ## Cloud Storage
 Object storage : 
 * NOT a Filesystem system with a hierarchy of folders
-* NOT a block storage, with operting data on blocks
+* NOT a block storage, with operating data on blocks
 
 We receive an ID, like URL and then we can retrieve the data, and we don't care how it is stored. 
 Provide high availabilty, high durability, fully managed scalable service.
@@ -423,7 +423,7 @@ On one side, you have a GKE clusters, replicated accross multiple zones, regiona
 On the other side, you install a GKE deployed on prem, best practices configuration already on pre-loaded. A turn-key production grade conformed versions of Kubernetes.
 Provide access to Cloud build, container registry, audit logging, and more.
 
-Both are intergrated with MarketPlace. Allow to use same configuration on both side of the network.
+Both are integrated with MarketPlace. Allow to use same configuration on both side of the network.
 
 To have a lifecheck and monitoring the onpremises application, Anthos comes with Istio Open Service, 
 and establish a communication with Anthos service Mesh with Cloud interconnect. This way, Anthos can retrieve the app runtime information
