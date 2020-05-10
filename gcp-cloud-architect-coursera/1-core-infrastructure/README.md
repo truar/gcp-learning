@@ -495,7 +495,7 @@ App engine standard, Flexible, Kubernetes
 ## Cloud Endpoints and Apigee Edge
 
 GCP can manage the API versioning you could have when exposing API. 
-The program can specify the version of the API, and the call il redirected to the good version.
+The program can specify the version of the API, and the call iS redirected to the good version.
 
 Cloud Endpoints:
 * Easy API exposure
