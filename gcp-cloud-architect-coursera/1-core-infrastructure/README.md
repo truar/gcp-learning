@@ -404,9 +404,9 @@ Can set the `update strategy`:
 
 
 ## Hybrid and multi-cloud computing
-Problems with classic on-premises environment: take from months to years to be able to reallocate power processing (buying new servers, installing apps and depenencies, network configuration...)
+Problems with classic on-premises environment: take from months to years to be able to reallocate power processing (buying new servers, installing apps and dependencies, network configuration...)
 
-But you can't always go from onpremises to cloud computing. So how can you achieve it gradually ?
+But you can't always go from on-premises to cloud computing. So how can you achieve it gradually ?
 Move your components at your own pace, and keep part of the systems on your premises
 
 **Anthos** is a hybrid and multi cloud solutions. Anthos framework rests on kubernetes and Google Kubernetes deployed on-prem.

@@ -410,7 +410,7 @@ Stateful and stateless have different challenges
     * Uses GCE, GKE, GAE, GRun, Gfunction
 8. Concurrency => Scale out by starting new processes, and scale back with load
 9. Disposability => Applications should be written to be more reliable than the underlying software they run on
-    * Handles temprary failures
+    * Handles temporary failures
     * Gracefully shutdown and restart quickly
 10. Development production parity => Same env as dev/stage and production.
     * Use containers for this + IAC = it makes it easier
@@ -625,7 +625,7 @@ google provides this components to build the integration pipeline.
         * Standard or custom step
     * Docker hosted-build service and is an alternative to Docker build
     * The CLI can be used to submit a build using gcloud
-        * `gcloud build submit --tag gcr.io/your-project-id/uamge-name .`
+        * `gcloud build submit --tag gcr.io/your-project-id/image-name .`
             * `--tag`: the tag name of the image. Must use the *.gcr.io.* namespace.
             * ` . `: represents the location of the source to build
 * Cloud triggers: watches changes in the repo and starts the build
@@ -848,7 +848,7 @@ Online and Offline data transfer option:
     * Options to delete objects not in source after transfer
     * Filter on file name, creation date
 
-* Storage transfer service on-prem
+* Storage Transfer service on-prem
     * Install on premises agent on your servers
     * Agent runs in a Docker container
     * Setup a connection to Google Cloud
@@ -1090,7 +1090,7 @@ Correlated failures: what are they ?
 The group of related items that could fail together is a failure domain
 
 How to avoid them ? Decouple servers and use microservices distributed among multilple failure domains 
-* Divide business logic into microservices bases on failure domains
+* Divide business logic into microservices based on failure domains
 * Deploy to multiple zones and/or regions
 * Finer level of granularity: Split responsability into components and spread over multiple processes
     * A failure in one component will not affect other components
@@ -1135,7 +1135,7 @@ Plan against positive feedback cycle overload failure
 * Circuit breaker pattern: protect from too many retries
     * Plan for degraded state operations
     * If a service is down and all its clients are retrying, the increasing number of requests can make matters worse
-        * PRotect the service behind a proxy that monitors health (the circuit breaker)
+        * Protect the service behind a proxy that monitors health (the circuit breaker)
         * If the service is not healthy, don't forward requests to it
         * Once it is up again, start sending the load, in a controlled manner
     * If using GKE, leverage Istio to automatically implement circuit breaker
@@ -1473,3 +1473,147 @@ The Data Loss Prevention API can be used to protect sensitive data by finding it
 * Can delete, mask, tokenize, secure hasing, bucketing, format preserving encryption or just identify the location of the sensitive data
 
 ### Design activity: Security
+
+## Maintenance and monitoring
+
+* Manage new service versions using rolling updates, blue/green deployments, and canary releases
+* Forecast, monitor and optimize service cost using the Google cloud pricing calculator and billing reports, and by analyzing billing data
+* Observe whether your services are meeting their SLOs using Cloud Monitoring and Dashboards
+* Use uptime checks to determine service availability
+* Respond to service outages using Cloud Monitoring alerts
+
+### Managing versions
+
+In a microservices architecture, be careful not to break clients when services are updated
+* A key benefit to microservice architecture is to be able to deploy services independently
+* Ensure backward compatibility for all your clients
+* Include version in URI
+    * If you deploy a breaking change, you need to change the version
+* Need to deploy new versions with zero-downtime
+* Need to effectively test versions prior to going live
+
+Rolling updates allow you to deploy new versions with no downtime
+* Typically, you have multiple instances of a service behind a load balancer
+* Update each instance one at a time
+* Rolling updates 
+    * work when it is ok to have 2 different versions running simultaneously during the update
+    * Are a feature of instance groups, just change the instance template
+    * Are the default in kubernetes, just change the Docker image
+    * Are completly automated with AppEngine
+
+Use a Blue/green deployment when you don't want multiple versions of a service running simultaneously
+* The blue deployment is the current version
+* Create a new environement (the green)
+* Once the green deployment is tested, migrate client requests to it
+* If failures occur, switch it back
+
+How to do so ?
+* In compute engine, use DNS switch to migrate requests from one load balancer to another
+* In kubernetes, configure your service to route to the new pods using labels
+    * Simple configuration change
+* In app Engine, use the Traffic splitting feature
+
+Canary releases can be used prior to a rolling update to reduce the risk
+* The current versions continues to run
+* Deploy an instance of the new version and give it a portion of the requests
+* Monitor for errors
+* The same approach as Blue/Green, but smoother
+How to do so ?
+* In compute engine, create a new instance group and add it as a backend in your Loadbalancer
+* In kubernetes, create a pod with the same labels as the existing pods. the service will automatically route a portion of requests to it
+* In app engine, use the Traffic splitting feature, and split traffic like 20-80, or 50-50...
+
+### Cost planning
+
+Capacity planning is a continuous, iterative cycle
+* Forecast (estimate capacity needed, monitor, repeat)
+* Allocate (determine resources required to meet forecastes capacity)
+* Approve (Cost estimation versus risks and rewards)
+* Deploy (Monitor to see how accurate your forecasts were)
+* And do it again, do a new forecast for new project, with knowledge you had in the loop
+
+Optimize cost of compute:
+* Start with smalls, and increase with tests if needed
+* Consider more small machines with auto scaling
+* Consider committed used discounts
+* Consider at least some preemptible VMs, when your algorithm can:
+    * 80% discount
+    * Use auto healing to recreate VMs when they are preempted
+* Google Cloud rightsizing recommendations will alert you when VMs are underutilized
+
+Optimizing disk cost
+* Don't overallocate disk space
+* Also, Determine what performance characteristics your application require:
+    * I/O pattern: small reads and writes or large reads and writes
+    * Configure your instances to optimize storage performance
+* Depending on I/O requirements, consider standard over SSD disks
+* 10Gb: 0.4$ standard / 1.70$ SSD
+* 1Tb: 40$ standard / 170$ SSD
+* 16Tb: 665.36$ standard / 5570.56$ SSD
+
+To optimize network costs, keep machines close to your data
+* Egress in the same zone is free
+* Egress to a different Google cloud server using internal or external IP address within the same region is free
+    * Except for some services such as MemoryStore
+* Egress between zone in the same region is charged
+* All internet egress is charged
+
+When using App Engine, it is using Internet egress to talk from one machine to another, therefor, it is charged
+
+GKE usage metering can prevent over-provisioning Kubernetes clusters
+* Compare requested resources with consumed resources
+* Data are gathered, and can be analyzed using BigQuery, or Data Studio dashboard
+
+Compare the costs of different storage alternatives before deciding which one to use
+* Choose a storage service that meets your capacity requirements at a reasonable cost:
+    * Storing 10Gb in firestore is free (under the free access tier)
+    * Storing 10Gb in Cloud BigTable would be around 1400$/month
+        * Because you still need a high number of nodes
+
+Consider alternative services to save cost rather than allocating more resources
+* CDN: Cache
+* Caching: MemoryStore
+* Messaging with Pub/Sub to decouple communicating services
+* Queueing
+* etc...
+
+For instance, don't create a datastore necessarily to share data between services: You can use Pub/sub. Could save some storage cost
+
+Use the Google Cloud Pricing Calculator to estimate costs
+* Based your cost estimates on your forecasting and capacity planning
+* Compare the costs of different compute and storage services
+
+To monitor the cost, use the Billing reports
+* Provide a detailed cost breakdown
+* the sizing recommendation for compute engine will also be in this report
+
+For advanced cost analysis, export billing data to BigQuery
+* Observe that the majority of your clients requests come from another continent, which increase the bill
+    * Relocate your services, use CDN...
+
+Visualize spends with Google Data Studio:
+* Daily and monthly view
+* Can also be drilled down for greater insights
+* Easy to read, share and customizable
+
+Set budgets and alerts to keep your team aware of how much they are spending
+
+### Monitoring dashboards
+
+To monitor SLO and SLAs:
+* Monitoring, logging, trace, debbuger, error reporter and profiler
+
+Monitor the things you pay for:
+* CPU
+* Storage capacity
+* Reads and writes
+* Network egress
+* Etc.
+* Helps determine the trends, bottlenecks and potential cost savings
+
+Monitor your SLIs to determine whether you are meeting your SLOs
+
+Create uptime checks to monitor availability and latency
+
+Latency is actually one of the four golden rules called out in Google's Site Reliability Engineering, or SRE book.
+

@@ -110,7 +110,7 @@ Gcp Edge Point of Presence (PoPs)
 * 90 internet exchanges and over 100 interconnection facilities around the world
 * Google peering DB entries
 
-Once again, is away from one of this location, use a Partner.
+Once again, if away from one of this location, use a Partner.
 
 They both provide Public IP addresses access to all google services
 
@@ -156,15 +156,15 @@ Example: 2 organizations, differents nodes, different resources. In order to con
 * the producer network admin needs to peer with the consumer network
 * The consumer network admin needs to peer with the producer network
 * When both are created, the session becomes active, routes are exchanged. 
-    * VMs can communicate privatly using their internal IP addresses
+    * VMs can communicate privately using their internal IP addresses
 * decentralized / distributed approach.
 * No latency (as internal use)
 * No cost drawbacks
 
 Shared VPC:
-* Not accross organizations
+* Not across organizations
 * Not within project
-* centralized network admin
+* Centralized network admin
 
 VPC Network Peering:
 * Across organizations
@@ -482,8 +482,8 @@ Example:
 Example:
 * Sources: Bigquery, Cloud storage, File Upload
 * Preparation
-    * Using CouldDataPrep
-    * Injecting prepared Data into CloudDataFlow
+    * Using Cloud DataPrep
+    * Injecting prepared Data into Cloud DataFlow
 * Analysis tools, like BigQuery/ML, Google Data studio, PartnerBI products, AI platform...
 
 ### Cloud Dataproc
