@@ -193,7 +193,7 @@ Container like kubernetes could be a bit different than what we are used to.
     * Auto restart
     * Live migrate
 * Per-second billing
-    * sustained used discount (the more you use, the less the hours is expensive)
+    * sustained used discount (the more you use, the less the hours are expensive)
 * Preemptible : 
     * up to 80% discount
     * No SLA

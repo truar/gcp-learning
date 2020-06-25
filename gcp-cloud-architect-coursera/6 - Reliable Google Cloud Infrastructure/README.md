@@ -1456,7 +1456,7 @@ For compliance, you may need to manage your own key
 * You create the keys and specify the rotation frequency (default 90 days)
 * You can then select your keys when creating storage resources like bucket and disks
 
-Customer Supplied Encryption Keys encryption keys are created in your environment and provided to Google Cloud
+Customer Supplied Encryption Keys are created in your environment and provided to Google Cloud
 * Use your own keys with Google Cloud Services
 * CSEK are supplied by calling the application per-API call
 * Only cached in RAM by google
@@ -1484,7 +1484,7 @@ The Data Loss Prevention API can be used to protect sensitive data by finding it
 
 ### Managing versions
 
-In a microservices architecture, be careful not to break clients when services are updated
+In a micro-services architecture, be careful not to break clients when services are updated
 * A key benefit to microservice architecture is to be able to deploy services independently
 * Ensure backward compatibility for all your clients
 * Include version in URI

@@ -253,77 +253,478 @@ How much data to synchronize ? Is it in both directions ? What is the source of 
 ## Configuring individual storage systems. Considerations include:
 
 ### Data storage allocation
+* Local Disk: Fast access, no persistence
+* HDD: persistent, cheaper than SSD
+* SSD: persistent, more expensive than HDD
+* Ask for more RAM when creating the machine
+* Cloud Storage for object
+* Cloud SQL, Spanner
+* BigTable, Firestore
+* InMemory
+* Filestore
+* BigQuery
 ### Data processing/compute provisioning
+* Use managed services powered by Google
+    * DataProc: own cluster hadoop. More control
+    * DataFlow: flow of processors to manage data
+    * DataPrep: Flow of data preparation, to be consumed by DataFlow
+    * BigQuery
+* Or create compute instance tailored given your needs
+    * Ask for more CPU, or RAM, or both
+    * Choose TPU if needed
 ### Security and access management
+* Restricts access using Service account following the principle of least privilege
+* Use IAM roles
+    * Primitive roles: Owner > Editor > Viewer (To be avoided)
+    * Predefined roles: Set of roles to accomplish certain tasks
+        * Based on permissions
+    * Custom roles: to fit your needs
+        * Based on same permission as Predefined
+    * Create groups, and affect users to a group, easier to manage later (add, remove people from a group)
+        * Group policy if possible then
+* Security is a shared responsability
+    * You are in charge of securing your application, data access
+    * Set appropriate roles to your users, or services
+    * CSEK (Customer Supplied Encryption Key)
+* Use Cloud-Aware proxy Identity to restrict access to application given a user
+
 ### Network configuration for data transfer and latency
+For Datatransfer:
+* GSutil: must have a project and a bucket created
+    * No minimum size or bandwidth required, but the transfer can be very long, if files are TB
+    * < 1TB for on-premises
+* Transfer service: minimum of 300Mb/s bandwidth
+    * For > 1TB and other cloud provider transfer
+* PB bytes of data: Transfer appliance
+
+Latency:
+* For a user, think of his geographic position: close to your regions ? 
+    * Global load balancer
+    * Choose region closer to the users
+* Cloud CDN to deliver static content and reduce latency (best solution to reduce latency by the way)
+
 ### Data retention and data life cycle management
+With Cloud Storage you can store binary files.
+* Enable the versioning to avoid deletion
+    * By bucket
+    * By default, versioning is disable, objects are unique, and immutable
+    * If you upload an existing file, it is overriden without copy or backup (if none configured)
+* Data retention: when do you want to move to another class, or delete your objects ?
+    * Regular (multi/region or single region) : Availability
+    * Nearline: access less than once a month
+    * Coldline: access less than once a quarter
+    * Archive: Access less than one a year
+    * The storage price decreases and the access price increases for each class above
+    * Choose to change a class storage given the file size
+    * choose how many versions you want to keep of each file
+    
 ### Data growth management
+* What will be the factor of data growth ?
+    * Number of users ?
+    * Daily usage where you keep creating and uploading files ?
+* How the system will react to that ? 
+    * Did you think about the storage price ?
+    * What part could break because of data growth
 
 ## Configuring compute systems. Considerations include:
 
 ### Compute system provisioning
+* Compute engines is the minimal service provided by Google
+    * Create your own Virtual machines
+    * Set information, like
+        * Name an region/zone
+        * CPU / RAM
+        * Disk (SSD, HDD), local ?
+        * Startup-script
+        * Network configuration (subnet, external/internal IP)
+* Group them to manage them with a Managed Instance Group
+    * Create a template to have the same VM
+    * Enjoy autoscaling, auto-restart
+    * rolling update is also possible
+    * Health check with Load Balancing
+    * Metrics for instance groups with StackDriver 
 ### Compute volatility configuration (preemptible vs. standard)
+* Preemptible is for reducing the cost of your compute resources
+    * A VM is up for 24h, after it is automatically stopped
+    * Google can request the resources of your VM, so don't rely on this VM for your business strategy
+    * Use it in a batch processing app, where this VM could decrease the time required for the batch, but not put it in jeopardy
+    * No SLA
+* Standard is for regular VM, but you can still get discount:
+    * committed usage: have a minimum usage of your VM, and you get a discount on it
+    * Sustained: at 50%, 75% and 90%, you get discount if you use the VM for a long period
+    
 ### Network configuration for compute nodes
-### Infrastructure provisioning technology configuration (e.g. Chef/Puppet/Ansible/Terraform/Deployment Manager)
-### Container orchestration with Kubernetes
+* VM can communicate with each other
+    * using the internal IP
+        * Without configuration if they are in the same VPC
+            * Even across different subnets
+        * with 2 distinct VPC
+            * With Cloud VPN
+            * With VPC peering
+            * With shared VPC
+    * Using external IP address (if the VM has one)
+* Firewall rules always need to be configured
 
+* For security, design a bastion host, to avoid access to your other VMs
+* Load balancer to access your VM
+### Infrastructure provisioning technology configuration (e.g. Chef/Puppet/Ansible/Terraform/Deployment Manager)
+The only way to reproduce an environment the exact same way (which gives you testing, regression detection possibilities), use the 
+deployment manager to configure your project with IaC (Infrastructure as a code)
+* Use Deployment Manager, Terraform (recommended because skills are portable)
+    * Also Chef, Puppet and Ansible if needed, or if in your team skills, or company policy
+* Create many similar project (for testing purpose)
+    * Or stress test
+* Use the deployment manager to deploy certified solution, like Jenkins, or Confluence...
+    * Very easy and fast
+    * Price quickly accessible
+### Container orchestration with Kubernetes
+* To use kubernetes to run your application and podes, you can create a GKE cluster
+    * Create the physical nodes (compute instances) on which your PODS will run
+    * Use `kubectl` CLI to manage your cluster 
+```
+gcloud container clusters get-credentials echo-cluster --zone=us-central1-a
+kubectl create deployment echo-web --image=gcr.io/qwiklabs-resources/echo-app:v1
+# Creates a LoadBalancer in your GCP project to expose your pod over the public internet
+kubectl expose deployment echo-web --type=LoadBalancer --port 80 --target-port 8000
+kubectl set image deployments/echo-web echo-app=gcr.io/qwiklabs-gcp-00-708c300b3c57/echo-app:v2
+kubectl scale deployments/echo-web --replicas=2
+```
+* Kubernetes names:
+    * A POD is a single unit of deployment
+    * Namespace logically groups PODS together
+    * Service exposes a POD (given the exposure type)
+    * Replicas replicate the POD in the environment, across the WorkerNode
+    * WorkerNode are compute engine instances (if using GKE)
+* There are different kinds of exposure:
+    * LoadBalancer: Creates a LoadBalancer (with GKE a HTTP load balancer) and expose the POD to the outside
+    * ClusterIP: Cluster not available outside of the container. Internal communication only
+    * NodePort: Exposes each Node outside the cluster. Access is <NodeIp>:<NodePort>
+    * ExternalName: Exposes using a DNS
+    * Ingress: routing users given a path (HTTP/S route for instance)
+   
+   
+* With regional GKE cluster, the master is replicated, so no downtime for a migration
+    * With Zonal Cluster, a downtime is possible
+* Master can updated
+    * Automatically by Google
+    * Or you can do it yourself
+```
+gcloud container get-server-config
+gcloud container clusters upgrade $CLUSTER_NAME --master
+gcloud container clusters upgrade $CLUSTER_NAME
+```
+
+* To resize a Node Pool (gcloud comand)
+```
+gcloud container clusters resize $CLUSTER_NAME --node-pool $POOL_NAME --size $SIZE
+# To drain the nodes before removal
+gcloud beta container clusters resize $CLUSTER_NAME --node-pool $POOL_NAME --size $SIZE
+```
+* Cluster autoscaling
+```
+gcloud container clusters create $CLUSTER_NAME \
+    --num-nodes $NUM \
+    --enable-autoscaling \
+    --min-nodes $MIN_NODES \
+    --max-nodes $MAX_NODES \
+    --zone $COMPUTE_ZONE
+```
+* Master IP rotation
+```
+gcloud container clusters update $CLUSTER_NAME--start-ip-rotation
+```
+* IAM roles are used to manage cluster access
+* Kubernetes uses RBAC (Roles based access control)
+    * Restrict access to resources inside the cluster  
+* For storage use GCP services (recommended)
+    * Or expose database in a container, and create/use volume to persist data
+* NodePools are used to group node with the same configuration together
+* Pay only for nodes, not PODS. (and not for the master)
+
+* Have features like
+    * auto-scaling (to scale your compute engine instances)
+    * Auto-restart (in case of failure)
+    * auto-repair (to fix a broken node)
+    
 # Designing for security and compliance
 ## Designing for security. Considerations include:
 
 ### Identity and access management (IAM)
+IAM: Identity Access Management:
+* Who can access what resources ?
+    * Who: a person or a service account (email)
+    * Can access: Set of roles
+        * Primitive roles: Owner > Editor > Viewer
+        * Predefined roles: set of permissions to allow an action on a resources
+        * Custom roles: define your own roles by aggregating permissions together, given your business needs
+* Use groups as a best practice
+* follow the "Least privilege principle": a person or service should be given the minimal set of rights to perform is daily job
+ 
 ### Resource hierarchy (organizations, folders, projects)
+* Organization and folder are only applicable in a company, they are optional
+* Resources are grouped by projects
+* Projects can be grouped into folders
+* Folders can be grouped into folders
+* Folders belong to an organization Node
+* What has been given by a upper node can be taken away
+    * You can apply roles to person (or service) at a specific folder or organization
+    * But you can't restrict the access at a lower level
+    * An "Owner" at the organization node will be owner of every project, even if configured differently at the project level
+    
 ### Data security (key management, encryption)
+* Encryption is at the heart of every service provided by Google
+    * at rest
+    * AES 256 symmetric key
+    * Keys are encrypted by the KEY (Key Encryption Key)
+* Key are automatically rotated to ensure a maximum of security
+* You can define your own periodicy: CMEK
+    * Customer Managed Encyrption Key
+    * Key created by google, but you have more control over the default key
+* You can provide your own key: CSEK
+    * Customer Supplied Encryption Key
+    * But you need to perform yourself the rotation
+    * Key created in your environment
+
 ### Penetration testing
+* You can perform your own penetration testing, without telling google.
+* You are independant if you test only your resources
+* When you do so, be very accurate and shape the scopes of the test
+
 ### Separation of duties (SoD)
+* Who is responsible of key rotation ? This is not the same as the one who can create them ?
+* Have a backup who can rotate the key if the primary one is not available
+* Create service account only for services, and regular account for regular people
+* Who can affect new roles ? At the organization node / Folder / projects ? 
+
 ### Security controls (e.g., auditing, VPC Service Controls, organization policy)
+* How to monitor security ? What logs are available ?
+* Stackdriver keeps a lot of access logs, this could be a great way to monitor access
+    * Define alert based on access log, check for many forbidden access to detect a potential attack
+* Organization policy: use PenTest to build a matrice of responsabilities, and see who has access to what resources ?
+
 ### Managing customer-managed encryption keys with Cloud KMS
+* You can define your own periodicy: CMEK
+    * Customer Managed Encyrption Key
+    * Key created by google, but you have more control over the default key
+    * Key management, key rotation, standards and policy compliance
 
 ## Designing for compliance. Considerations include:
 
 ### Legislation (e.g., health record privacy, children’s privacy, data privacy, and ownership)
+HIPAA:
+* No certification reconginzed by the US HSS for HIPAA compliance
+* Shared responsabilities between Google and the customer
+* Google is audited every year for certains certification, like:
+    * SSAE16 / ISAE 3402
+    * ISO 27001
+    * ISO 27017: Cloud Security
+    * ISO 27018: Cloud Privacy. Standard of practice for protection of personal identifiable information (PII)
+    * FedRAMP ATO
+    * PCI DSS v3.2
+* Customer responsabilities:
+    * Making sure the application they build on top of GCP is HIPAA compliance
+        * Security, data access, Roles, authentication
+    * Require a Business Associate Agreement from your account manager
+        * Not all GCP features are HIPAA compliance. Make sure your do not use such feature
+        or disable them if you don't need them
+    * For a full list of services, see: https://cloud.google.com/security/compliance/hipaa
+    * Plus, there is a list of best practices, like:
+        * Configure and use properly the IAM roles
+        * do not cache in CDN PHI information
+        * Avoid using PHI information in any part of the process (build, deployment, run)
+GDPR: 
+* Google ensures, like usually, many things at rest of its system
+    * Security experts, lawyer 
+    * Confidentiality training for the employee with a confidentiality agreement
+    * Make sure third part they are using are compliant too
+* As a customer, you have to
+    * Familiarize yourself with the provisions of the GDPR
+    * Create an updated inventory of personal data that you handle. You can use some of our tools to help identify and classify data.
+    * Review your current controls, policies, and processes for managing and protecting data with the GDPR’s requirements. Find the gaps and create a plan to address them.
+    * Consider how you can leverage the existing data protection features on Google Cloud as part of your own regulatory compliance framework. Review G Suite or Google Cloud Platform’s third-party audit and certification materials to begin.
+    * Review and accept our updated data processing terms via the opt in process described here for the G Suite Data Processing Amendment and here for the GCP Data Processing and Security Terms.
+     
 ### Commercial (e.g., sensitive data such as credit card information handling, personally identifiable information [PII])
+PII:
+* Protect sensitive data using the Cloud Data Loss prevention API
+* 
 ### Industry certifications (e.g., SOC 2)
+* ...
 ### Audits (including logs)
+* Use the stackdriver suite to get the access logs.
+* Require an audit
+* Protect your application
 
 # Analyzing and optimizing technical and business processes
 ## Analyzing and defining technical processes. Considerations include:
 
 ### Software development life cycle plan (SDLC)
+* Choose the right to enhance your softwate development team, and use the best of GCP
+* Cloud Source Repositories is very handy when using the profiler to audit on production your code, and detect potential bugs
+    * Combine it with some other solutions, like GitHub, GitLab or others solutions
+    * Google will keep the repo in sync
+* Cloud Container Registry: To store your docker image in your project
+* Cloud Build / Cloud Trigger: To build image on GCP
+* Deployment manager: To automatically deploy solution, like complete project, or part of your application
+
 ### Continuous integration / continuous deployment
+* To build a Continuous Integration
+    * Use Source Repositories, Cloud Build and Cloud Trigger to create your image as soon as new code is pushed  
+    * Use Cloud Build to build an image out of your code
+        * It is like doing Docker build for instance, but it is directly on your Google Container Registry
+    * Combine with Cloud Trigger to start a build each time a push is made on a branch, or on every branch
+* To have a Continuous Delivery process
+    * Use a third part software, like spinnaker, or Jenkins
 ### Troubleshooting / post mortem analysis culture
+* Don't look to blame someone. Instead, use this as a way to improve your system in its globality
+* Conduct Post-mortem analysis with your team, and focus on finding the root cause of this
+* Make sure the problem won't ever happen again
+
 ### Testing and validation
+* Testing is a required process to validate your application before the production
+* Testing cost money, but how much is a regression in your system ? Can you afford it ? What is the impact on your customer if so ?
+* Use the Deployment manager to deploy a testing environment which is a mirror of your production
+    * Ensure you run stress test, nominal cases and anything you judge necessary to validate your version
+* Create a pipeline to deploy everything automatically, and releases become just another automated part in your deployment, no longer a charge
+* Ensure everythings is "green" before sending it to production 
+
 ### Service catalog and provisioning
+* Use the Deployment Manager and the Marketplace to deploy fast certified application to your system
+    * A blog with wordpress
+    * Jenkins for automated pipeline
+    * ...
+* Create your own template file to deploy your infrastructure quickly the same way 
 ### Business continuity and disaster recovery
+* Make a disaster plan
+* Plan for exercice to make sure your process is validated and can actually perform a rollback
+* Identify the elements that are covered by a potential disaster (natural, bad actions, server down) and how your system have to react to it
+    * Cold backup: just a backup file you play. Usually, system is up in a hour
+    * Warm backup: system up in minutes
+    * Hot backup : no downtime (or barely seconds)
 
 ## Analyzing and defining business processes. Considerations include:
 
 ### Stakeholder management (e.g. influencing and facilitation)
+* Identify the person in your company that have access to some cloud based decisions. 
+    * What are their roles ? Business ? Technique ? Architect ?
+    * What solutions can you find that will allow them to do their jobs ? Datascientist for ML ? Engineer for deploying apps ?
 ### Change management
+* Quality is a process, not a product. 
+* What can you do to enable a change culture in the company.
+    * From going to on-premises with rigid process to Cloud with more agile process ?
+* What would be the cons from migrating or just using the Cloud ? 
 ### Team assessment / skills readiness
+* Team training is a big part of a Cloud Architect
+    * Having the team ready in case of emergency
+    * Emergency situation test to repeat the process
+* How will you make your team ready for such situation ?
+    * What skills do you need to practice ?
+    * Reactivity ? Process ? Calm under pressure ?
 ### Decision-making process
+* How long do you need to make a decision ? 
+* Do yo you have a minimal time you can't reduce ?
+* In case of unexpected situation, how fast can you react ? Depending on what ?
+    * The situation ?
+    * Your skills ?
+    * Your infrastructure
 ### Customer success management
+* What can you measure to ensure the success of your product ?
+   * Latency for customer to get a fast access ?
+   * Throughput to deal with many customers at the same time
+   * Durability to keep customer data
+   * Availability to have your application always accessible
+* What metrics applies the best to yout product ?
+    * Video game: number of players
+    * Financial: Number of transactions ?
+    * WebSite: Number of unique visitor ?
+* How do you know what time is the best to get a v2, or improve the existing application
+    * And what to improve first ?
 ### Cost optimization / resource optimization (capex / opex)
+* Migrating to the cloud will make you have operation expenditures instead of Capital expenditure
+    * You no longer pay for big machine upfront
+    * Pay for what you need, and get a billing issue at the end of the month
+* Gain in flexiblity by starting more VMs if needed, or reduce the compute power if you no longer need it
+* What gain do you want to make ? What are your financial goals ?
 
 ## Developing procedures to ensure resilience of solution in production (e.g., chaos engineering)
+To ensure the liveness of your application, you need to define disaster recovery scenario in case of a system failure.
+Did you identify everything that could cause your system to collapse ? How do you plan to make your application work in case of partial failure ?
+* Cascading failure, Correlated failure, SPOF, Queries of death, positivie feedback failure (retries)
+* Circuit breaker pattern, SPOF: N + 2 machine, Health checks, Divide business logic, make system independant
+
+Prepare your team for such a scenario. Create a spare environment in which you can practice your active recovery skill
+
+Techniques:
+* Obviation: Design a systelm where a specific error can not occur
+* Prevention: Take steps to ensure a problem will not occur
+* Detection and migration: Detect a failure before or as it is happening, with alerts based on metrics. Take steps to reduce the effect
+* Graceful degradation: Reduce your system to limit the risk and the spread of the problem. Fix it, and go back to normal work
+* Repair: Fix a problem, it won't happen again
+* Recover: Plan your system to recover when such an error occured (easy button strategy)
 
 # Managing implementation
 ## Advising development/operation team(s) to ensure successful deployment of the solution. Considerations include:
 
 ### Application development
+* GKE, GCE, App Engine, Cloud Run, Cloud Function, Containers
+
 ### API best practices
+* Cloud SDK is a great tool to interact with Google API
+* For more automated system, use REST API to interact with Google
+* Cloud ML has some features available for Machine Learning
+    * Cloud Vision API, Cloud speech to text, Cloud text to speech, Cloud Translation API, Cloud Natural language API, Cloud Visio Intelligence API, DialogFlow Enterprise Edition
+    
 ### Testing frameworks (load/unit/integration)
+* Different kind of test:
+    * Black box: Test a system from a user perspective who doesn't know how it works. Focus on user experiences
+    * White box : Use your knowledge to work on inner part. Improce performance
+    * Unit
+    * Integration
+    
 ### Data and system migration tooling
+* Cloud Transfer Service (for on-premises to cloud migration), gsutil (for service on cloud), Cloud Transfer appliance (for massive data)
 
 ## Interacting with Google Cloud using GCP SDK (gcloud, gsutil, and bq). Considerations include:
 
 ### Local installation
+* Install the SDK on your system, very easy, depends on the system you're using
 ### Google Cloud Shell
+* Use Cloud shell that stores up to 5GB of your home dir
+    * Connect to a compute engine automatically
+    * Very easy, you have your account connected by default
+    * Easy to simulate a service account
 
 # Ensuring solution and operations reliability
 ## Monitoring/logging/profiling/alerting solution
-
+* Stackdriver suite is great to monitor your application
+    * Logging: Get the log of your application, but also security log, audits logs, data access logs, and ensure your data are safe
+    * Trace: Know what are your latency point, what request take most of the time
+    * Error: Connect to the error of your system (can also be done with logging)
+    * Debugger: Take snapshot of your code and debug without end user impact
+    * Monitor: Create your dashboard to keep track of your application metrics evolution
+        * Create alert to receive a notification when an action is required
+        * Send notification like email, pubSub or more
+        * Create uptimeChecks to ensure the liveness of your product
+    * Profiler: Profile your code to know what part takes most of the time
+    
 ## Deployment and release management
+* A/B testing: make subpart of user testing new features, and collect early feedback
+* Canary deployment: Migrate to your new version steps after steps
+* Green/Blue deployment: Create a blue deployment, and once ready, migrate the green to the blue
+* Rolling update
+* Rollback in case of error
 
 ## Assisting with the support of solutions in operation
+Use GCP tools to control and reduce risk of your system while working.
+* Health check to make sure system is up and running
+* LoadBalancer to ensure service access from the outside world
+* GKE, GCE, App engine for solution in production
+* Logging access with stackdriver
+* Cloud deployment Manager to reproduce environment
 
 ## Evaluating quality control measures
+What measures do you have to ensure quality of the system ? 
+* What are you monitoring and why ?
+* Is it latency, to make sure the user get a request fast
+* Do you want to know how long a system responded after it received the last packet
+* Is it security control, which you can view in log access

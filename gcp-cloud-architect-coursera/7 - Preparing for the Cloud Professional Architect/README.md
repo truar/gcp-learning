@@ -99,7 +99,7 @@ Exam outilne
 * Integration with on premises/multi-cloud environments: 
     * When to use gsutil, gsutil rsync, and Storage Transfer Service
 * Cloud native networking (VPC, peering, firewalls, container networking)
-    * Understand all the networking serviecs and how to connect for throughput, security, billing and so forth
+    * Understand all the networking services and how to connect for throughput, security, billing and so forth
 * Identification of data processing pipeline matching data characteristics to storage systems
     * Velocity (how frequent), Volume (How much), Variety (Format, structure), Volatility (how often does it change) - which services match ?
 * Data flow diagrams
@@ -198,7 +198,7 @@ Exam outline
 * Network configuration for data transfer and latency
     * Location makes a difference in egress charges and round-trip time
 * Data retention and data lifecycle
-    * What is the Nealine and Coldline policy ? When to delete data ?
+    * What is the Nearline and Coldline policy ? When to delete data ?
 * Data growth management
     * When do you need a different way to organize the data ? 
     * How much/how big will the current design support ?
@@ -361,7 +361,7 @@ Exam outline
 ### Analyzing and defining business processes
 
 Exam outline
-* Skateholder management (influencing and facilitation)
+* Stakeholder management (influencing and facilitation)
     * Who are the gatekeepers and what roles do they play ?
     * How can you enable them to do their jobs ?
 * Change management
@@ -458,8 +458,8 @@ Alert on customer pain. Alerting for the right reason.
 
 "Hope is not a strategy". Strategies for dealing with a failure
 * Obviation: Design a system in which a particular type of failure is impossible
-* Prevention: Take steps to ensure that a possible does not occur
-* Detection and migration: Detect a failure before or as it is happening, and take teps to reduce or eliminate the effects of it
+* Prevention: Take steps to ensure that a possible problem does not occur
+* Detection and migration: Detect a failure before or as it is happening, and take steps to reduce or eliminate the effects of it
 * Graceful degradation: Instead of failing completly, handle stress and return to full service when the issue passes
 * Repair: Fix the problems. Hopefully, it won't come back, at least not in the same way
 * Recover: Allow the problem to occur and get service back as quickly as possible. Measure indicators of recovery and work to improve them
@@ -474,7 +474,7 @@ Human processes:
 ### Case study 6
 
 Microservices use cases. 
-* Indenpency between services, resilience (one down does not crash the entire backoffice)
+* Independency between services, resilience (one down does not crash the entire backoffice)
 * Rolling update / easy rollback
 * Custom Metrics for usage
 
