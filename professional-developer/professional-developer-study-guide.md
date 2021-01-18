@@ -242,9 +242,36 @@ PubSub main characteristics:
 Since recently, you can use an Apache Kafka cluster managed by Confluent. Apache kafka features for this level of information are quite similar to PubSub
 
 #### Graceful shutdown on platform termination
-PAAS ? Stopping instance ?
+To graceful shutdown an instance, the application needs to handle properly a Sigterm signal.
+
+##### Kubernetes
+https://cloud.google.com/blog/products/gcp/kubernetes-best-practices-terminating-with-grace
+
+When kubernetes decides to remove a POD to manage resources differently, it will enter the Kubernetes termination lifecycle, where it triggers:
+- PreStop hook is executed. Use to close / stop tierce-API or things like that
+- In parallel, it sends a SIGTERM to your application. This is the role of your application to terminate connection, storing sessions back into the storage...
+- After the TerminationGracePeriod (30s by default) it sends a SIGKILL, forcibly removing the pod
+
+##### AppEngine
+
+AppEngine sends a ` /_ah/stop` request to your application, which has now 30 seconds to gracefully shutdown. This signal occurs when AppEngine is configured to manage the autoscaling of your application, or when you remove an instance manually.
+
+##### Compute engines
+
+When your Compute Engines receives a Termination command, it executes the shutdown script configured by the user when it creates the instance or the Managed Group:
+* If the application receives the `instances.delete` or `instances.stop` request
+* When your compute engine is preemptible
+* When the user manuallu shutdown or reboot the VM, like `sudo shutdown` or `sudo reboot`
+* Using the gcloud CLI
+But it will not be run (the shutdown scripts) if the application receives `instances.reset`
+
+Of course, it works the samy if your instance is part of a Managed Instance Groups and you configured an autoscaling behavior.
+
 #### Google-recommended practices and documentation
-?
+https://cloud.google.com/docs
+https://cloud.google.com/solutions/best-practices-for-running-cost-effective-kubernetes-applications-on-gke
+https://cloud.google.com/appengine/docs/standard/python/microservice-performance
+https://cloud.google.com/compute/docs/instance-groups
 
 ### 1.2 Designing secure applications. Considerations include:
 
