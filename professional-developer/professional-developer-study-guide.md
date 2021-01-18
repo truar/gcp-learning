@@ -210,7 +210,7 @@ From all API management solutions, this one seems to be the more complete with t
 ##### API gateway
 
 Provides a secure access to services through a well-defined REST API that is consistent across your services.
-* Easy app consu;ption for developers
+* Easy app consumption for developers
 * Change the backend implementation without affecting the public API
 * Scaling, monitoring and security features built in.
 
