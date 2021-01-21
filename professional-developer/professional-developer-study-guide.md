@@ -276,28 +276,232 @@ https://cloud.google.com/compute/docs/instance-groups
 ### 1.2 Designing secure applications. Considerations include:
 
 #### Implementing requirements that are relevant for applicable regulations (e.g., data wipeout)
-RGPD ?
+
+When designing an application, it is important to take into consideration the security principles that must be applied for the audience you are targeting. Most of the regulations are not addressed only by Google. Indeed, security regulations is a shared responsabilities between you and Google, where you need to do your part of the job.
+
+##### ISO/IEC 27001
+
+Google is certified ISO/IEC 27001 that helps organization keep their information asset secure. It provided a set of best practices, requirement for Information Security System (IMS) and details security controls.
+
+##### HIPAA
+Health Insurance Portability and Accountability Act of 1996 is a law that establishes data privacy and security requirements for organizations that are charged with safeguarding individuals protected health information (PHI). 
+
+##### GDPR
+Defines a set of regulations to protect data regarding one individual for EU citizens.
+
+The MOST important part here is to realize security is a shared responsabilities and you as a developer must take action in order to fulfill the applicable regulations
+
 #### Security mechanisms that protect services and resources
 https://cloud.google.com/docs/authentication/#service_accounts
 
+To prevent access to your services and resources, you need to configure IAM. IAM is based on roles and permissions.
+
+* A role is a set of permission that gives access to resources and services hosted on GCP.
+* A role is granted to a set of members or groups that must perform actions on GCP
+* You must follow the principle of least privileges when assigning rights, which means to need grant more than the member needs to perform its actions
+* Members can be added to a group. Groups are used to managed more easily the different rights.
+
+When we talk about users in GCP, we identify differents members:
+* Service account: To authenticate a GCP resources or services
+* Google Account: to authenticate an end user (with password, or SSO...)
+* Google group: to group members inside the same group (like function, or profile to more easily managed company policies)
+* Cloud identity domain
+
+The identity of a GCP members is an email.
+
 #### Security mechanisms that secure/scan application binaries and manifests
-security scanner
+Container analysis is the tool provided by GCP to scan and analyse images on Artifact Registry and Container Registry. It provides a REST API consumable to retrieve metadata computed about your different images/artifact.
+
+Please note Container Analysis is now a paid services and needs to be enable in the Container and Artifact registry.
+
+It analyses the layer your image is based on and generates a report with different level of severity.
 
 #### Storing and rotating application secrets and keys (e.g., Cloud KMS, HashiCorp Vault)
+
+##### Key Management System
+Any GCP users can use their custom security keys using KMS (Key management system). A KMS is store that contains all user-supplied and google-managed cryptographic key.
+
+In KMS, you can store symmetric and asymmetric key.
+
+To store encryption keys, you need to use KMS.
+https://www.qwiklabs.com/focuses/1713?parent=catalog
+
+You can store Google managed key in KMS by creating a KeyRings and a Cryptographic key
+```shell script
+gcloud kms keyrings create $KEYRING_NAME --location global
+
+gcloud kms keys create $CRYPTOKEY_NAME --location global \
+      --keyring $KEYRING_NAME \
+      --purpose encryption
+```
+
+Then, to encrypt/decrypt data, you can interact with the KMS public API
+```
+curl -v "https://cloudkms.googleapis.com/v1/projects/$DEVSHELL_PROJECT_ID/locations/global/keyRings/$KEYRING_NAME/cryptoKeys/$CRYPTOKEY_NAME:encrypt" \
+  -d "{\"plaintext\":\"$PLAINTEXT\"}" \
+  -H "Authorization:Bearer $(gcloud auth application-default print-access-token)"\
+  -H "Content-Type: application/json"
+
+curl -v "https://cloudkms.googleapis.com/v1/projects/$DEVSHELL_PROJECT_ID/locations/global/keyRings/$KEYRING_NAME/cryptoKeys/$CRYPTOKEY_NAME:decrypt" \
+  -d "{\"ciphertext\":\"$(cat 1.encrypted)\"}" \
+  -H "Authorization:Bearer $(gcloud auth application-default print-access-token)"\
+  -H "Content-Type:application/json" \
+| jq .plaintext -r | base64 -d
+```
+
+Then, you can configure IAM permissions to manage access to key and keyrings:
+* cloudkms.admin: allows anyone with the permission to create KeyRings and create, modify, disable, and destroy CryptoKeys
+* cloudkms.cryptoKeyEncrypterDecrypter: is used to call the encrypt and decrypt API endpoints.
+
+You can upload encrypted data into Cloud Storage, and decrypt it in your application, making sure the information is never publicly accessible.
+
+##### Hashicorp vault
+To store secret, you can use the Hashicorp Vault secret manager.
+https://www.qwiklabs.com/focuses/1210?catalog_rank=%7B%22rank%22%3A1%2C%22num_filters%22%3A0%2C%22has_search%22%3Atrue%7D&parent=catalog&search_id=8610803
+
+Basically, deploy a Hashicorp vault into a Compute engine instance and configure Google to communicate with this instance.
+
+Configure 2 environment variables:
+```shell script
+export VAULT_ADDR="$(terraform output vault_addr)"
+export VAULT_CACERT="$(pwd)/ca.crt"
+```
+And then use the `vault` command (the vault tool needs to be installed first on your system. It will then communicate with the Vault on the compute engine)
+```shell script
+vault operator init \
+    -recovery-shares 5 \
+    -recovery-threshold 3
+```
+
+Don't forget, your compute engine instance needs to be available for remote TCP connection (configure a TCP Load Balancer with firewall rules to allow 80/443 connection)
+
 #### Authenticating to Google services (e.g., application default credentials, JSON Web Token (JWT), OAuth 2.0)
+
+Authenticating a GCP services a available with:
+* An application default credentials. If your services need to access another GCP services, then the application will lookup for a  `GOOGLE_APPLICATION_CREDENTIALS` environment variable containing the credentials information. 
+    * By default, every Google Services have a service account with Editor Role (to be validated if ALL default account are EDITOR). But the best practices would be to create a specific service account and restrict access to unnecessary services/resources.
+* Tje OAuth 2.0 protocol, you can authenticate an end user to access your services. This is useful if you need to know the end user accessing the resources
+* An API Key, handy when the resources is protected and you don't need to know the identity of the users/services accessing the resources.
+
+To authenticate an end user, but more freely, with no restriction to the IAM configuration, you can also use the Cloud Identity Platform services, you can also authenticate end users with a JWT token. The request is sent with the Firebase admn SDK to the authentication service, a JWT is sent to the user, which passes it to the resources server. The server asks firebase if the token is valid to grant access to the resources.
+
+https://cloud.google.com/docs/authentication
+
 #### IAM roles for users/groups/service accounts
+
+IAM is the GCP service to manage access to GCP services. You can configure:
+* user accounts: To authenticate end user to access the platform
+* service accounts: To authenticate services to communicate with one another
+* Groups : to group user/services into groups to easily manages roles
+
+A role is a set of permission to grant access to GCP services. Google provides `Predefined roles`, the default ones.
+
+You need to respect the principle of least privileges to avoid uncesseary access to users and so security leaks.
+
+Within an organization, you can define roles to users on the organization or folder level. Once an access is granted at a higher level, it can't be revoked in a project. Be careful with that !
+
+You can create your own roles if needed, by assembling permissions together. Those roles are called `custom role`
+
+The previous version of IAM os still working, where you find 3 `basic roles`:
+* VIEWER : Read action that do not affect state
+* EDITOR : VIEWER + changing existing states (adding resources, updating, deleting...)
+* OWNER : EDITOR + Roles management + Billing management
+
+Do not use basic roles on production...
+
 #### Securing service-to-service communications (e.g., service mesh, Kubernetes Network Policies, and Kubernetes namespaces)
+
+A service mesh is an infrastructure layer built with your application to manage, observe and secure communications across your services (like retry policy ?). It enables the developer to focus on coding business value, and not dealing with basic infrastructure code.
+
+In your entire infrastructure, you can have as many service mesh as you have applications. All meshes together creates a mesh metwork.
+
+Kubernetes comes with a service mesh, called Istio, to manage services to services communication. I guess (needs to check) that Istio is responsible for mapping the service name your service calls to send the requet to the correct PODS. Besides, with the kubernetes network policy, you can define what services can be sent to a specific pod. You also have kubernetes namespace to isolate pod together by grouping them to form a cluster logically connected together. If you want to talk to another namespace, you need to use its public HTTP entry point.
+
+--> Training kube might be a good idea
+
 #### Running services with least privileged access (e.g., Workload Identity)
+
+It is a best practice to ensure your application runs with the least privilege it needs to success in its task. By default, a GCP service has EDITOR basic roles. It is always good to create a specific service accunt for a specific Workloads with the minimal roles.
+
+Like when running a service in Cloud Run, you can also configure the service account for a Compute engine instance (at creation), when using GKE and running PODS, or even with App Engine (for a specific services ?)  
+
 #### Certificate-based authentication (e.g., SSL, mTLS)
+
+To access a GCP services with a LoadBalancer, you can use Google managed certificate or your own custom certificate. When requesting a server, if HTTPS is used, the client will encrypt the request the public key of the target server. The public key is managed by central organization that contains all public key for a specific websites. The request is then decrypted by the server with its private key. For websites, everybody has access to the server public key.
+
+For an internet, the public key might not be known by global organization. In this case, you need to configure your client to add the public key (certificate) into your machine to encrypt data sent to the server (and also using the client private key to decrypt the data).
+
+A LoadBalancer can have multiple SSL certificates. The client can specify what certificates to use.
+Using SSL is a way to ensure a secured communication, but you can not know the identity of the caller. For this, you need to use Google Authentication solutions.
+
 #### Google-recommended practices and documentation
+https://cloud.google.com/load-balancing/docs/ssl-certificates
 
 ### 1.3 Managing application data. Considerations include:
 
 #### Defining database schemas for Google-managed databases (e.g., Firestore, Cloud Spanner, Cloud Bigtable, Cloud SQL)
+
+##### Firestore
+
+A NoSQL storage solution to store Documents (like MongoDB). To create a good schema, you need to take into considerations the use cases or your application in term of reads/writes. Indeed, Firestore has a limit of 1 write per second on an Entity. If you go over that limit, you can face contention and latency occurs (with failed requests also). 
+* A document can not be bigger than 1Mo
+* An entity key size is limited to 6Ko
+* You can nest entities in entities. But you are limited to 20 nested levels.
+* To query a data, an index has to be created first. No index, No query.
+* APi size request: 10Mo
+
+##### Cloud Spanner
+
+A distributed RDBMS to handle heavy reads/writes to a SQL database. Use this if your CloudSQL can't handle the loads. Just like in any SQL database, you define:
+* Tables with attributes
+* Tables with relationships to other Tables (foreign Key)
+    * With Spanner, you can create interleaved table (nested the child table directly into the parent table to increase query)
+
+To have more info, see "Defining a key structure for high-write applications using Cloud Storage, Cloud Bigtable, Cloud Spanner, or Cloud SQL"
+
+##### Cloud BigTable
+
+The key point is to understand that a schema in BigQuery is designed for the query you plan to use. See "Defining a key structure for high-write applications using Cloud Storage, Cloud Bigtable, Cloud Spanner, or Cloud SQL" to have more information regarding rowkey.
+
+BigTable is:
+* A Key/Value storage system
+* Only the RowKey is indexed (which explain why you need to think query first, unlike a RDBMS system where you can add more indexes)
+* Rowkeys are sorted lexicographically
+* Group column into a Column fa;ily
+* Column in a Column family are sorted in lexicographic order
+* All operations are atomic on a RowLevel
+* Intersection of Row + Column can contain multiple timestamped cells (a unique version of the data)
+* You need to distribute reads and writes evenly
+* Tables are sparse => an empty cell does not take place on the storage
+
+##### Cloud SQL
+
+RDBMS system. Just rely on Cloud Spanner, both are equivalent on term of Schema. Just notice in classic RDBMS, you can not have interleaved table, you can only express table relationships with Rowkey. Just like any other system, you can create index on some column, groups of colums. Define also Primarey key (automatically indexed).
+
 #### Choosing data storage options based on use case considerations, such as:
 ##### Time-limited access to objects
+
+Objects in Cloud Storage does not need to be accessed all the times. By using a `Signed URL`, you can set a duration that ensure the validaty of the access within the timeframe you specified.
+
 ##### Data retention requirements
+
+Retention policies are used to define a minimal time an object needs to be preserved before doing any modification. Before this time, the object can not be deleted or modified (but metadata can). 
+
+Cloud Storage offers the possibility to configure a bucket with a retention policy to ensure an object will not be modified later, before the retention policy has passed.
+* Retention policy can be set on bucket creation or on an existing bucket
+
+Keep in mind:
+* A retention policy can be locked. You can change it after.
+* You can still edit object's metadata
+* Retention policy contains an effective time
+* To see when an object will be modifiable again, see the "retention expiration date" on the objet's metadata
+* You can combine lifecycle management with retention. The deletion of an object by the lifecycle will occur only if the object has passed the retention period
+* You can't combine object versioning and retention policy 
+
 ##### Structured vs. unstructured data
+
+
+
 ##### Strong vs. eventual consistency
 ##### Data volume
 ##### Frequency of data access in Cloud Storage
