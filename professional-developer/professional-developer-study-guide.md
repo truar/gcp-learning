@@ -500,18 +500,80 @@ Keep in mind:
 
 ##### Structured vs. unstructured data
 
+Structured data are data you can store in GCP databse service as Spanner, BigTable, SQL or Firestore. Indeed, when storing those data, you transform the unstructured input into a structured format, with rowkey, indexes and way to fetch the data easily.
 
+Unstructured data are all data that are basically in a binary file, which can not be queried immediatly. Cloud Storage is a perfec fit to store unstructured data, but their usage is limited.
+
+To transform unstructured data to structured data, you can use an ETL, such as Cloud Datapred, or Cloud DataFlow, or using an HBase cluster (provided by GCP) to transform the input data.
 
 ##### Strong vs. eventual consistency
+
+Regarding the Database service you are using, some guaranty Strong consistency on operations, other eventual consistency. Let's delve deeper:
+* Spanner: ACI++D transaction -> Strong consistency. I++ because: 
+    * Isolation level is SERIALIZABLE READS (no phantom reads) for a transaction (reads-only or reads-writes)
+* SQL: ACID transaction -> Strong consistency
+* Firestore: ACID transactio with Isolation level at SERIALIZABLE READS -> Strong consistency
+* BigTable: By default it uses eventual consistency: A write made in one cluster is eventually persisted to the others.
+    * But for some cases, you can enforce a read-your-writes consistency, but you loses replication across regions for such specific data. This is configured for a group of application. Not all your applications might need a read-your-writes consistency
+    * An even enforces Strong consistency for all of your applications by configuring a single-router routing (and one failover, but it is just a failover, not an available replicas to use in the workloads)
+
+* Storage: Some operation are guarantied Strongly consistency, some others (like changing IAM permission on an object) are eventually consistent.
+    * Strongly consistent operations:
+        * Read-after-write
+        * Read-after-metadata-update
+        * Read-after-delete
+        * Bucket listing
+        * Object listing
+    * Eventually consistent operation:
+        * Granting access to or revoking access from resources.
+
+
 ##### Data volume
+
+High volume of data are better handled by Cloud BigTable, Cloud Spanner and Cloud Storage. If you respect the best practices in term of shema, rowkey definition, indexes... you could create application that supports high volume traffic.
+
+Cloud SQL and Firestore are less usable for high volumes traffic. For instance, Firestore supports high reads, but low writes (1s per entity max) and Cloud SQL, well it is Cloud SQL.
+
 ##### Frequency of data access in Cloud Storage
+
+Cloud storage provided 4 storage classes:
+* Standard Storage: Data are accessed frequently. No retention policy by default. Very low access fees, Very high storage fees
+* Nearline Storage: Data are accessed on a monthly basis. 30 days retention. Low access fees, High storage fees
+* Coldline Storage: Data are accessed on a trimestrial basis. 90 days retention. High access fees, low storage fees
+* Archive Storage. Data are accessed on a annual bais. 365 days retention. Very high access fees, very low storage fees
+
 #### Google-recommended practices and documentation
 
 ### 1.4 Application modernization. Considerations include:
 
 #### Using managed services
+
+As much as possible, it is always recommended to use Managed services. By using them, you enjoy the experiences of many years on may projects for your application. If you need a database, don't use a PostgreSQL started on a Compute engine you manage yourself. Use Cloud SQL. You need a messaging system, choose PubSub. Data storage, use a Storage service...
+
+If you do not, you might have to think about all the implications of not doing so, like resiliency, availability, backup...
+
 #### Refactoring a monolith to microservices
+
+Refactoring a monolith application to a microservices application should never be taken lightly. These decision will impact your entire application on subjects you never imagined before... Indeed, having the comfort of working in an ACID environment is the most comfortable...
+
+Besides, you will never be able to move all at once. It is mandatory to move parts after parts, gain experiences with the first API migration, and then move on to the next step.
+
+So, you have to move step by step... Starts by creating an API gateway... The gateway will intercept the call, and then redirects it to the monolith. Once it is working properly and stable, then extract an endpoint and then change the gateway to send those specific request to the new microservices...
+
+Besides, you will also have to think scalability: How yous system will evolve under load peaks ? With a monolith, it is more likely you will perform a vertical scalability: having a more powerful system. With microservices, you can think in terms of horizontal scalability.
+
+And then comes the questions about databases, where you can choose more accuratly system that best fits your needs in term of data storage.
+
+When talking about communication, you might need now a Pubsub system for async command, or using HTTP request for sync query... So you need to think in term of latency, throughput, Correlation ID...
+
+And even more consideration
+ 
 #### Designing stateless, horizontally scalable services
+
+Stateless is becoming the new standard when developing REST API. The sessions are no longer managed on server side, which is one factor that makes horizontal scalability difficult to apply. Instead, it is delegating to the client, using Cookies, and any server can handles the client request. This makes the system more scalable.
+
+But, in some cases, you might need session management. If it the cases, you couls use solution like MemoreStore to very quickly retrieve the client session for instance.
+ 
 #### Google-recommended practices and documentation
 
 
@@ -520,29 +582,195 @@ Keep in mind:
 ### 2.1 Setting up your local development environment. Considerations include:
 
 #### Emulating Google Cloud services for local application development
+
+Using the `gcloud` tool, you can start emulator of some services on your own computer, making your development easier and faster. The available emulator are:
+* bigtable
+* datastore
+* firestore
+* pubsub
+* spanner
+* (for SQL, it is easy for you to set this up)
+
+To start an emulator, you can use:
+```shell script
+gcloud beta emulators GROUP COMMAND
+```
+With GROUP being one of the service listed above. COMMAND being specific to the GROUP specified.
+
+```
+gcloud beta emulators datastore start
+```
+
 #### Creating Google Cloud projects
+
+Projects are the main resource you will need in GCP. Every resources you create are linked to a project. Do not be afraid of creating and deleting projects, are the fees only apply for services you create in the project.
+
+To create project, you can either use the GCP console (only web application: https://console.cloud.google.com), or use the `gcloud` tool
+```shell script
+gcloud projects create PROJECT_NAME --set-as-default
+```
+
+Consider then two things about your project: the name and the ID. If the name is unique, then it will also be the ID. If it is not, then il will create a different ID. The ID is unique name of your project, and must be used to know on whch GCP project the resource needs to be created. 
+
 #### Using the command-line interface (CLI), Google Cloud Console, and Cloud Shell tools
+
+The `gcloud` tool is very handy once installed on your computer. You can manage all your instances using the CLI, and even using the emulators. For full docs, see: https://cloud.google.com/sdk/gcloud
+
+You can also use the WebApplication if you feel like it. You can manage almost the same things when using the CLI or accessing the WebApp. 
+
+With the WebApp, you have access to Cloud Shell, a virtual environment with the `gcloud` tool installed. Easy to execute some command to test things without impacting your entire system. 
+The Cloud shell :
+* is executed on a Compute Engine instance (Debian based Linux OS).
+* Data inside the Compute engine is persisted, but lost after 1hours of inactivity.
+* %Go of free persistent storage mounted as $HOME.
+* Storage per user, cross project.
+* This storage does not timeout, unlike the instance itself. (only $HOME)
+* Full documentation: https://cloud.google.com/shell/docs/how-cloud-shell-works
+
 #### Using developer tooling (e.g., Cloud Code, Skaffold)
+
+Cloud Code is an extension to some of the most famous IDE, like VSCode or Intellij. It helps managing Cloud native application. Some features are:
+* Deploy Cloud run services
+* Speed up Kubernetes development
+* Easily integrate Cloud APIs
+* Extends to production deployment
+* Access to Cloud Storage
+* Secret manager
+
+Skaffold is also a tool provided by Google, installable on your computer. It helps you manage easily your kubernetes cluster with configuration, like namespaces, images and so on.
 
 ### 2.2 Writing efficient code. Considerations include:
 
 #### Algorithm design
+
+Writing algorithm should be done carefully, It is easy to solve a problem, it is hard to solve it properly. Many applications are simply application that responds to a user inout and change data in the database. But when it comes to application where logic and intelligence and required, you need to know some algorithm families in order to fallback on one of them.
+
+* Like sorting array algorithms
+* Tree analysis
+* Heap..
+
+Besides, one the most common notation to analyse an algoritm is O(n).
+* O(n) which means the algorithm will evolve in a linear way given the input data size, like standard array iteration
+* O(1) which indicates the algorithm will always take the same time, no matter the input data. Usually, to reach a O(1), you need to compromise with memory footprints by using a Map for instance. You reduce the time needed by increasing the memory footprint.
+* O(nlogn): when you sort an array, it is always O(nlogn). Which means the more input data you have, wider the gap will be between two execution N and N+1
+* O(n^2): Should be avoided, as the algorithm time will increase exponentially as the input data grows... in other words, it doesn't scale and should be avoided.
+
 #### Modern application patterns
+
+In the Cloud, Microservices is the main modern application pattern. You split your services with well defined responsabilities to ensure the success of your use cases.
+Those services will communicate with one another using HTTP request, or sending async message. The major difficulties with microservices is to find a proper split. And of course, there is no single solution. One very known anti-pattern is to split the services by technical consideration, which diminushes the horizontal scalability possibilities.
+
+To split properly the microservices, the usage of strategic DDD could be helpful in order to find natural boundaries between microservices, and avoiding the pattern of putting every new code in a new microservices.
+
+You also find the classic 3 tiers application: Frontend, backend and Database.
+This approach is very common the layering architecture inside an application: Controller / Service / Infrastructure.
+
+Nowadays, when applicable, we hear a lot about DDD application: 
+* Hexagonal architecture, with Primary/driving adapters (left side) and Secondary/Driven adapaters (right side). (https://alistair.cockburn.us/hexagonal-architecture/)
+* Exposition layer
+* Infrastructure Layer
+* Application layer
+* Domain Layer
+* The overall idea is to easily change a technical implementation, like database accessm pubsub system for another one, without impacting the business (domain layer) code.
+
+Of course, with GCP, the micro services pattern with each services its own storage service is more than encourages, in order to facilitate scalability of your application.
+
 #### Software development methodologies
+
+Agile methoologies are famous currently to build a software:
+* Developers and clients proximity
+* Constant communication with the clients
+* Features Priorization
+* Possibility to adapt if market or needs evolve
+
+Software Craftsmanships:
+* SOLID
+    * SRP: Single responsabilty: a class has one reason to change
+    * OCP: Open for extension, close for modification: Adding features can be done by extending current behavior
+    * Liskov: A child can not refuse its legacy (inheritance vs composition)
+    * ISP: Interface segregation principle: An interface is exposing only useful resource to the client
+    * DIP: Dependency inversion principle: High level modules do not depend on low level module. Both should depend on abstractions.
+
+XP practices come back into play more and more. To develop application with quality, you mostly find:
+* Pair programming: 2 developers code together in order to achieve a feature
+* Mob Programming: N developers code together to achieve a feature
+* TDD: Test Driven Development. Guide your development with Step by step test that helps you build your application
+* ATDD: Acceptance TDD: Starts with an acceptance (i.e sometimes user) tests to keep in mind the end result you expect, and build your algorithm steps by steps using TDD.
+* Code review: before merging code, you make sure the code is correct regarding your team shared practices (code readability, testability, naming convention...)
+* Sources management tool: Do not even think of developing without Git (or equivalent... bt I don't know them). That is a great tool to centralize the code bases with tagging, commit, branch management...
+    * Sources repositories is the GCP service to manage your source code. It can be sync with Github if you prefer to keep your sources there.
+* CI/CD : To shorten the feedback loop of your development, and to send a story in production quickly, you need to create a Continuous Integration or Deployment pipeline. This pipeline will run tests automatically and deploy application on the environment.
+    * Cloud Build is the GCP service to let you create your CI/CD pipeline
+* and even more, but I think those are the main ones. 
+
 #### Debugging and profiling code
+
+Debugging an application is part of the developer life. When an error occured, and it will, you need to be able to debug the application. You can not debug in production, as it will stop the application for the end users, not possible ^^. But you could reproduce the bug locally if possible. If not, you can use the Debugger tool of GCP to take hot snapshot of your application. giving you the ability to understand what happens in your code.
+
+Profiling code helps to understand where you have low performace. Does a method take more times than others ? How long before ending the code. Great profiling tool is very important to understand what causes a latency for a client. GCP provides Profiling, a tool to profile your application on production. If you do not have such tool, you endup monitoring your application with timer inside your application, which makes your profiling harder to analyse.
+
+--> TODO : Labs on stackdriver debugger and/or monitoring
 
 ### 2.3 Testing. Considerations include:
 
 #### Unit testing
+
+Unit test are very fast, specific test of your application. Their purpose is to test a unit of functionality. They can span multiple classes, as long as it is still testing the same unit of functionality.
+
+In a Unit test, you can mock dependencies to external services, like calling an API or something.
+
+A unit test must not leave your memory or go through the network in order to stay fast, and independant from the environment.
+
+When developing using the DDD patterns, you have to unit test a lot your domain layer. This is critical, in order to quickly adapt and resolve in case of a bug after a code change... 
+
+You really need to rely a lot on unit test, and integration tests, which are much slower,and does not gives you a feedback as fast as possible.
+
 #### Integration testing
+
+Integration tests are tests that test a group of functionality together. They are usually slower, as you can reach a database, or simulate an API call... those tests are expensive to run and must be considered carefully. Of course, you need integration test in your application, but you need less of them than Unit tests. 
+
 #### Performance testing
+
+PPerformance testing, a non-functional testing technique performed to determine the system parameters in terms of responsiveness and stability under various workload. Performance testing measures the quality attributes of the system, such as scalability, reliability and resource usage.
+
+To have an efficient performance test session, you need to know first what metrics you want to capture. Are you checking throughput, latency, resiliency, Availability ? 
+
+You find different subsets of performance testing, like: 
+* Load testing
+* Stress testing: It is performed to find the upper limit capacity of the system and also to determine how the system performs if the current load goes well above the expected maximum.
+* Soak testing: Soak Testing also known as endurance testing, is performed to determine the system parameters under continuous expected load. During soak tests the parameters such as memory utilization is monitored to detect memory leaks or other performance issues. The main aim is to discover the system's performance under sustained use.
+* Spike testing: Spike testing is performed by increasing the number of users suddenly by a very large amount and measuring the performance of the system. The main aim is to determine whether the system will be able to sustain the workload.
+
 #### Load testing
+
+Load testing - It is the simplest form of testing conducted to understand the behaviour of the system under a specific load. Load testing will result in measuring important business critical transactions and load on the database, application server, etc., are also monitored.
 
 ### 2.4 Building. Considerations include:
 
 #### Source control management
+
+A source control management is mandatory for any software development. Even if you are a single developers, it is mandatory. When working in teams, it helps the team focusing on development, and provides features like branching, tagging and merging to keep track of the source code. 
+
+It also provides history to go back to a previous state if needed.
+
+GCP provides Sources Repositories, an online repositories, like Github, to store team source code. It is based on Git. Source repositories is important when using Monitoring, profiling and debugging of application hosted on GCP. It is also useful to trigger build deployments with Cloud build, when a new branch is pushed for instance. 
+
+A Source repositories can be sync with GitHub or BitBucket if you wish to store your source code in another place.
+
 #### Creating secure container images from code
+
+// TODO
+
 #### Developing a continuous integration pipeline using services (e.g., Cloud Build, Container Registry) that construct deployment artifacts
+
+To develop a Continuous integration?deployment pipelines, you can use Cloud Build. Cloud Build is a tool like CircleCI or TravisCI, providing CI as a service. 
+
+You can configure your CI pipeline in a `cloudbuild.yaml` file that respect the Cloud Build format (https://cloud.google.com/cloud-build/docs/build-config?hl=en). You define `steps` that are the task to execute. Tasks are executed in a Docker container. You can specify the Docker image (`name`) for the step depending on the task you have to perform (like maven build, docker push, yarn...).
+
+* Volumes
+* Shared folder /workspace
+* others stuff about cloud build
+
 #### Reviewing and improving continuous integration pipeline efficiency
 
 
