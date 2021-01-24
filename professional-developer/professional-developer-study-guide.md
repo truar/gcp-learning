@@ -759,20 +759,89 @@ A Source repositories can be sync with GitHub or BitBucket if you wish to store 
 
 #### Creating secure container images from code
 
-// TODO
+When you run application on GCP, you will need to create a Docker image (if you deploy on AppEngine, you won't need Docker). This Docker image is used when running the application on GKE cluster, or on Cloud Run, or even on Compute Engine (by checking : run with an image).
+
+So when you need to provide your own Docker image, you create a `Dockerfile`. Docker works by layering the content of the `Dockerfile` to favor reusability. You base your image on top of another one. For instance, to run a Spring Boot application, you could an image containing a JRE installed. If you prefer to create your own image, you can have an alpine-linux as base image, and then install only the tool you need...
+
+Anyway, once the Dockerfile is created, it can be run by a runtimeContainer. Docker is also a runtimecontainer. So you can run your image using 
+```shell script
+docker build -t gcr.io/PROJECT_NAME/my-image:latest .
+docker run gcr.io/PROJECT_NAME/my-image:latest
+```
+
+Choosing a base image must be considered carefully. I recommend:
+* Choose only an official image as a base image, to make sure you do not have unknown vulnerabilities
+* Favor official images also to make sure it will be maintained and evolve over time
+* Try to keep your image as small as possible. So rely only on what is strictly necessaery to run... It not useful to import more than needed, as you might have mure vulnerabilities because of that
+
+And to ensure the security of your image, you can security scanner, a GCP service that scans Containers Registry and Artifact Registry.
 
 #### Developing a continuous integration pipeline using services (e.g., Cloud Build, Container Registry) that construct deployment artifacts
 
-To develop a Continuous integration?deployment pipelines, you can use Cloud Build. Cloud Build is a tool like CircleCI or TravisCI, providing CI as a service. 
+To develop a Continuous integration?deployment pipelines, you can use Cloud Build. Cloud Build is a service like CircleCI or TravisCI, providing CI as a service. 
 
-You can configure your CI pipeline in a `cloudbuild.yaml` file that respect the Cloud Build format (https://cloud.google.com/cloud-build/docs/build-config?hl=en). You define `steps` that are the task to execute. Tasks are executed in a Docker container. You can specify the Docker image (`name`) for the step depending on the task you have to perform (like maven build, docker push, yarn...).
+You can configure your CI pipeline in a `cloudbuild.yaml` file that respects the Cloud Build format (https://cloud.google.com/cloud-build/docs/build-config?hl=en). You define `steps` that are the task to execute. Tasks are executed in a Docker container. You can specify the Docker image (`name`) for the step depending on the task you have to perform (like maven build, docker push, yarn...).
 
-* Volumes
-* Shared folder /workspace
-* others stuff about cloud build
+Every steps shares the same volumes, `/workspace`. This folder is shared among all the steps. So you can build your project in one step and build the Docker image in the other... If you need more than the default volumes, examples, you want to persist the maven local repositories as you need to perform several maven build in the pipeline, you can define your own `volumes`, Cloud Build will persist them. 
+
+By default, the execution is linear, which means steps are executed after one another, in the order defined in the `cloudbuild.yaml` file. If you need parallelism, you can use `waitFor` with `id` to say, my step will wait only for the step `id` to finish. So here starts a parallel pipeline.
+
+To push images on Containers registry, you define a custom step executing a `docker push`, or you can use the `images` statement (at the same level as `steps`). At the end of the pipeline, Cloud build will automatically push images to the specified hub. 
+
+The purpose of the pipeline is to build your project, executing unit and integration test and then build your artifact. You can go further by executing end-to-end tests after your application has been deployed when you are not deploying `main` for instance... It is up to you.
+
+To make sure you hve a full CI pipeline, you need to use Cloud Trigger (and Source repositories, it is easier). This combination will trigger a build every time a push is made on a branch of your application (on a branch, or on anything you specified in Cloud Trigger). You can use `substitutions` variable in your `cloudbuild.yaml` file to make the most of it. Like using a particular namespace for kube, or a specific service for cloud-run, or running your application with specific EMV variable to connect to a different database depending if you are deploying staging or production...
+
+* CloudBuild does not support conditional steps yet. So you need to perform that manually with a shell `if`... Not great
+* CloudBuild does not support caching automatically. If you want a cache (like the maven local repository, you need to define it yourself...)
+
+Here an example of a complete `cloudbuild.yaml` file:
+```yaml
+steps:
+  - id: 'dockerize-project'
+    name: gcr.io/cloud-builders/docker
+    dir: backend
+    args: [ 'build',
+            '-t', 'gcr.io/$PROJECT_ID/backend:$SHORT_SHA',
+            '-t', 'gcr.io/$PROJECT_ID/backend:latest',
+            '.' ]
+
+  - id: 'push-to-cloud-registry'
+    name: gcr.io/cloud-builders/docker
+    args: [ 'push', 'gcr.io/$PROJECT_ID/backend:$SHORT_SHA' ]
+
+  - id: 'deploy-cloud-run'
+    name: gcr.io/cloud-builders/gcloud
+    dir: backend
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        apt-get update
+        apt-get install -qq -y gettext
+        export PROJECT_ID=$PROJECT_ID
+        export IMAGE_VERSION=$SHORT_SHA
+        envsubst < cloudrun-backend.yaml > cloudrun-backend_with_env.yaml
+        gcloud beta run services replace cloudrun-backend_with_env.yaml \
+                  --platform=managed --region=europe-west1
+        gcloud run services add-iam-policy-binding application-backend \
+                  --platform=managed --region=europe-west1 \
+                  --member="allUsers" --role="roles/run.invoker"
+
+
+images:
+  - 'gcr.io/$PROJECT_ID/backend:$SHORT_SHA'
+  - 'gcr.io/$PROJECT_ID/backend:latest'
+``` 
 
 #### Reviewing and improving continuous integration pipeline efficiency
 
+The quicker the pipeline, the sooner you get a feedback. It is important to manage efficiently your pipeline:
+* Execute in parallel what can be
+* Make sure you log enough information to understand what went wrong
+* Run your unit and integration tests at least
+* Use cache if needed to avoid downloading many times the same resources
+* Use substitutions variables to have a conditional build and deploying within the same project on different services
 
 ## Section 3: Deploying applications
 
