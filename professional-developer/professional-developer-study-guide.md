@@ -847,18 +847,114 @@ The quicker the pipeline, the sooner you get a feedback. It is important to mana
 
 ### 3.1 Recommend appropriate deployment strategies using the appropriate tools (e.g., Cloud Build, Spinnaker, Tekton, Anthos Configuration Manager) for the target compute environment (e.g., Compute Engine, Google Kubernetes Engine). Considerations include:
 
+* Cloud Build: A GCP service that provides steps to build, containerize and even deploy your applications. Everything is "low-level" as you can do anything you want, but you might need to implement everything yourself (like canary or blue/green deployment...)
+* Spinnaker: Opensource, multi-cloud continuous delivery platform that helps releasing software changes. Supported by Netflix, it enables, through some configuration (Application, cluster, server-groups, load balancer, firewall, deployment strategies...) to deploy your application (based on a trigger, like push to a container registry). It gives the possibility to deploy regarding your deployment strategy: canary, blue/green and rolling updates. 
+    * Labs: https://www.qwiklabs.com/focuses/552?catalog_rank=%7B%22rank%22%3A1%2C%22num_filters%22%3A0%2C%22has_search%22%3Atrue%7D&parent=catalog&search_id=8680538
+    * To work properly, Spinnaker needs:
+        * a dedicated service account with restricted access (only to `storage.admin` and `pubsub.subscriber`)
+        * To trigger a build, Spinnaker reads messages from PubSub
+        * It deploys the application in a GKE cluster
+* Tekton: Tekton is a cloud native continuous integration and delivery (CI/CD) solution. It allows developers to build, test, and deploy across cloud providers and on-premise systems. Apparently, like Spinnaker, it lets build, through abstractions, your CI/CD pipeline to deploy regarding your deployment strategies: canary, blue/green and rolling updates. Tekton seems to be specialized in kubernetes deployment.
+* Anthos Configuration manager: Is a service provided by GCP to manage multi-cloud and on-premises environment. You can enforce security policies or others by using Anthos, that will replicate the change you made on GCP to all others platforms.
+
 #### Blue/green deployments
+* In compute engine, use DNS switch to migrate requests from one load balancer to another
+* * In kubernetes, configure your service to route to the new pods using labels
+      * Simple configuration change
+* In app Engine or Cloud run, use the Traffic splitting feature
+
 #### Traffic-splitting deployments
+* In compute engine, configure the load balancer to enable Traffic splitting
+* In kubernetes, configure traffic splitting in deployment file
+* In appEngine and CloudRun, enables by default. Just specify the value to split (20-80, 50-50...)
+
 #### Rolling deployments
+* In compute engine, change the instance template (if managed by an instance group)
+* In kubernetes, Just change the image version, kube will do the rest
+* In appEngine, CloudRun: already provided by default
+
 #### Canary deployments
+* In compute engine, create a new instance group and add it as a backend in your Loadbalancer
+* In kubernetes, create a pod with the same labels as the existing pods. the service will automatically route a portion of requests to it
+* In App Engine or CLoudRun, use the Traffic splitting feature, and split traffic like 20-80, or 50-50...
+
+Basically, for some deployment strategies, you can rely on GCP default tools, it works well. But for some others, you might need the support of a CD tool, like Spinnaker, Tekton or Anthos. The tool you choose will depend on the use case.
 
 ### 3.2 Deploying applications and services on Compute Engine. Considerations include:
 
 #### Installing an application into a virtual machine (VM)
-#### Managing service accounts for VMs
+
+When using a Compute Engine, you have a lot of possibilities to install your application. You need to run or execute your specific command (like using `apt-get`, or deploying using Ansible...).
+
+Then, once the application runs on your compute engine, you need to configure the accessibility to your application. For these, you need to configure the Firewall rule to make sure the VM can be accessed from the outside.
+
+With a Firewall rule, You can then add a LoadBalancer.
+
+But the most efficient way to configure an application is to Instance Managed Group. To do so:
+* Define an instance template, that will execute a startup script to install your application
+* Create an instance managed group (even if with only 1 instance) to have the possibilities to add more VM in case of peak loads.
+* Configure a LoadBalancer to dispatch request to the groups
+    * Have a Health check to know if your instance is healthy
+
 #### Bootstrapping applications
+
+To bootstrap an application, use an Instance template. You can create it from scratch, by specifying any attributes you might need, like boot disk size, disk size, network, network tags (in combinaition with firewall rules).
+
+Or, you could also create a template from a running instance, very handy when you are trying to see of your application will work in such configuration.
+
+````shell script
+gcloud compute instance-templates create example-template-custom \
+    --machine-type e2-standard-4 \
+    --image-family debian-9 \
+    --image-project debian-cloud \
+    --boot-disk-size 250GB
+````
+
+#### Managing service accounts for VMs
+
+As always, you need to ensure the principles of least privileges. To do so when using a Compute engine instances, you can configure the service account that will be using the VM. If your VM doesn't need access to a GCP resources, the best way to ensure security is to create a service account with no specific roles.
+
+You can also set a specific scopes that will be targeted by the instance... I think a good practice is to create a service account with restricted IAM roles... But the scopes can also limit the different request you can perform...
+
 #### Exporting application logs and metrics
+
+An instance records all audit logs. Audit logs are available in the Logs Viewer. A compute engine instances logs 3 types of logs:
+* Admin activity logs: Modification of compute engine metadata or resource. Any API call that creates, deletes, updates or modifies a resource.
+* System event logs: system maintenance on Compute engine resources
+* Data access logs: Read-only operation on Compute engine resources, like get, list... It logs ADMIN_READ logs, and DATA_READ or DATA_WRITE logs, unlike Cloud Spanner, Storage or BigTable.
+
+With Stackdriver, you can also have a centralized view and create dashboard about your compute engine resources. For that, you need to install stackdriver agents on your Compute engine instance:
+```shell script
+curl -sSO https://dl.google.com/cloudagents/add-monitoring-agent-repo.sh
+sudo bash add-monitoring-agent-repo.sh
+sudo apt-get update
+sudo apt-get install stackdriver-agent
+sudo service stackdriver-agent start
+
+curl -sSO https://dl.google.com/cloudagents/add-logging-agent-repo.sh
+sudo bash add-logging-agent-repo.sh
+sudo apt-get update
+sudo apt-get install google-fluentd
+sudo apt-get install google-fluentd-catch-all-config-structured
+sudo service google-fluentd start
+```
+
+Those agents extract metrics from your Compute Engine, like CPU usage (even if CPU is available with no agent), memory footprint and other information. You can create dashboard in StackDriver to monitor your VM and set up some uptime check and altering policy based on some metrics (CPU usage and other...).
+
 #### Managing Compute Engine VM images and binaries
+
+To create a compute engine, you need to specify the base image you want to use. Some images are publicly available and install the basic OS (like debian, CentOS...). The images list is available in the "Compute Engine" menu of the GCP console.
+
+Most of the times, this might be enough. But you can also provide your own image to be the base of your application. You can create new image based on an existing disk that has been set by a Compute Engine instance. 
+
+Let's say you always want to have the same base image... You can have a template that runs commands like `sudo apt-get...` but in this case, a new instance might not have the exact same configuration as the old ones... Pretty risky. A solution is to create a base image on an existing disk, to reuse that image in the instance template. This way, you make sure the new instance that will created will rely on the exact same base as the others running.
+
+TODO: 
+* https://www.qwiklabs.com/focuses/611?catalog_rank=%7B%22rank%22%3A1%2C%22num_filters%22%3A0%2C%22has_search%22%3Atrue%7D&parent=catalog&search_id=8708397
+* https://www.qwiklabs.com/quests/81?catalog_rank=%7B%22rank%22%3A1%2C%22num_filters%22%3A0%2C%22has_search%22%3Atrue%7D&search_id=8708394
+* https://cloud.google.com/monitoring/quickstart-lamp
+* Create an image based on an image disk
+
 
 ### 3.3 Deploying applications and services to Google Kubernetes Engine (GKE). Considerations include:
 
@@ -903,12 +999,12 @@ The quicker the pipeline, the sooner you get a feedback. It is important to mana
 
 #### Enabling a Cloud API
 #### Making API calls using supported options (e.g., Cloud Client Library, REST API or gRPC, APIs Explorer) taking into consideration:
-#### Batching requests
-#### Restricting return data
-#### Paginating results
-#### Caching results
-#### Error handling (e.g., exponential backoff)
-#### Using service accounts to make Cloud API calls
+##### Batching requests
+##### Restricting return data
+##### Paginating results
+##### Caching results
+##### Error handling (e.g., exponential backoff)
+##### Using service accounts to make Cloud API calls
 
 
 ## Section 5: Managing application performance monitoring
