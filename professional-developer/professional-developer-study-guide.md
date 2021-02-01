@@ -895,6 +895,8 @@ But the most efficient way to configure an application is to Instance Managed Gr
 * Create an instance managed group (even if with only 1 instance) to have the possibilities to add more VM in case of peak loads.
 * Configure a LoadBalancer to dispatch request to the groups
     * Have a Health check to know if your instance is healthy
+    
+If you need to install your application manually first, chances are you will need to log into the instance. To do so, you can use the SSH button provided by GCP, or you can also execute SSH from your computer. If you do so, you will need to configure your SSH publick key as an authorized public key to connect to your instance.
 
 #### Bootstrapping applications
 
@@ -949,24 +951,274 @@ Most of the times, this might be enough. But you can also provide your own image
 
 Let's say you always want to have the same base image... You can have a template that runs commands like `sudo apt-get...` but in this case, a new instance might not have the exact same configuration as the old ones... Pretty risky. A solution is to create a base image on an existing disk, to reuse that image in the instance template. This way, you make sure the new instance that will created will rely on the exact same base as the others running.
 
-TODO: 
+LABS: 
 * https://www.qwiklabs.com/focuses/611?catalog_rank=%7B%22rank%22%3A1%2C%22num_filters%22%3A0%2C%22has_search%22%3Atrue%7D&parent=catalog&search_id=8708397
+    * Autoscaling based on a custom metrics, sent to stackdriver by an application executed inside a Compute Engine instance.
+    * Startup scripts for templates are stored in Cloud Storage. When creating an instance, it will first download and execute startup script
+    * Instance groups can be configured to respond to metrics to autoscale the group
 * https://www.qwiklabs.com/quests/81?catalog_rank=%7B%22rank%22%3A1%2C%22num_filters%22%3A0%2C%22has_search%22%3Atrue%7D&search_id=8708394
 * https://cloud.google.com/monitoring/quickstart-lamp
+    * Create a compute engine instance installing an apache server
+    * Install the stackdriver agents for logging and monitoring (works also with AWS)
+    * Create custom metrics for your VM
+    * Create uptime check with alert policy (email, pubsub...)
+    * Create your own cuwtom dashboard with graph and metrics (CPU, Bytes received...)
 * Create an image based on an image disk
 
 
 ### 3.3 Deploying applications and services to Google Kubernetes Engine (GKE). Considerations include:
 
+Labs: 
+* https://www.qwiklabs.com/focuses/2771?catalog_rank=%7B%22rank%22%3A1%2C%22num_filters%22%3A0%2C%22has_search%22%3Atrue%7D&parent=catalog&search_id=8750898
+* https://www.qwiklabs.com/quests/24?catalog_rank=%7B%22rank%22%3A1%2C%22num_filters%22%3A0%2C%22has_search%22%3Atrue%7D&search_id=8750906
+
 #### Deploying a containerized application to GKE
+To connect kubernetes to the GKE cluster, you need to run an authentication command:
+```shell script
+gcloud container clusters get-credentials quiz-cluster --zone us-central1-b --project <Project-ID>
+```
+
+Once you are connected to the GKE cluster, you can run `kubernetes` command to deploy your application in the cluster.
+With Kubernetes, you have different options to deploy an application. You can either use
+* `kubectl create -f ./frontend-deployment.yaml` Or `kubectl apply -f ./frontend-deployment.yaml`. This command reads your description file and make sure your cluster and application are configured like the description file. It can update your cluster by only applying and executing the command to go from the curent state to the desired state.
+* Or you can create and manage your cluster manually with some commands to create what you need
+
+```shell script
+kubectl get nodes
+> Get all nodes in the default namespace
+
+kubectl create deployment kubernetes-bootcamp --image=gcr.io/google-samples/kubernetes-bootcamp:v1
+> Create a deployment called kubernetes-bootcamp and runs the image grc.io in containers
+> By default, the application runs in a single instance (a single replicas ?)
+
+kubectl get deployments
+> Get all deployments in the default namespace
+
+kubectl get pods
+> List all pods in the cluster in the default namespace
+> option -l to filter by label
+
+kubectl describe pods
+> Describe all the pods by giving a lot of information like 
+>  * IP address (for inside the cluster)
+>  * The containers currently running
+>  * The events logs to trace the pod state
+
+kubectl logs <POD_NAME>
+> Displays all logs (all data send to STDOUT)
+
+kubectl exec $POD_NAME env
+> Runs the command env inside the POD identified by its name
+
+kubectl exec $POD_NAME bash
+> Runs a bach in your Pod. You can then execute any command of your choice (available in your pod)
+
+kubectl get services
+> List the services in the default namespace
+
+kubectl expose deployment/kubernetes-bootcamp --type="NodePort" --port 8080
+> Exposes the deployment kubernetes-bootcamp with a NodePort services for a Node exposing the application with the port 8080
+
+kubectl describe services/kubernetes-bootcamp
+> Describe the service
+
+kubectl label pod $POD_NAME app=v!
+> Apply new label to the pod
+> Pod can be changed by service or deployment
+
+kubectl delete service -l run=kubernetes-bootcamp
+> Delete all services matching the label run=...
+
+kubectl get rs
+> Get the replicasset of the cluster
+
+kubectl scale deployments/kubernetes-bootcamp --replicas=4
+> Increase/decrease the number of Pods up to 4 for the kubernetes-bootcamp deployment.
+
+kubectl set image deployments/kubernetes-bootcamp kubernetes-bootcamp=jocatalin/kubernetes-bootcamp:v2
+> Change the image of the deployment to start a rolling update
+
+kubectl rollout status deployments/kubernetes-bootcamp
+> Check if the rollout is fully performed (enables to wait in a CI/CD pipeline before movign forward)
+
+kubectl rollout undo deployments/kubernetes-bootcamp
+> In case of error during the deployment of a new version, you can rollback to the previous state
+
+```
+
 #### Managing Kubernetes RBAC and Google Cloud IAM relationships
+
+##### Kubernetes RBAC 
+Kubernetes Roles Based Access Control is the control system kubernetes relies on when it comes to User management. In order to restrict user access inside the cluster.
+
+The RBAC API is based on 4 objects:
+* Role
+    * A set of permissions within a particular namespace.
+* ClusterRole
+    * A set of permissions across all namespaces
+* RoleBinding
+    * Bind a user/group or service account to a Role for a particular namespace, or bind it to a ClusterRole for application within your namespace
+* ClusterRoleBinding
+    * Bind a user/group or service account to a ClusterRole, across all the namespaces. 
+
+##### IAM roles
+
+In GCP, you can manage user access to a project resources by granting roles. Roles are a set of permissions that allow the user to perform a specific actions with it belongs to a particular roles.
+
+##### IAM + RBAC
+
+With GKE, instead of having 2 authentications system, RBAC and IAM, IAM and RBAC are integrated together.
+To authenticate to a GKE cluser, use the command: 
+```shell script
+gcloud container clusters get-credentials quiz-cluster --zone us-central1-b --project <Project-ID>
+```
+> Please note any user needs to have granted the role `container.clusterViewer` that gives the ability to at least connect to a cluster. You then need to ask for other permission to perform actions in the cluster.
+
+You can bind cluster/roles to different kind of users. A Kind is the name RBAC understands knowing what kind of users it expects to grant the roles. Coupled with IAM, the same Kind can mean different things:
+* Kind User: 
+    * Google Cloud registered email address
+    * IAM service account
+* ServiceAccount: A kubernetes service account
+* Group: Email address of a Google Group that is itself the member of the Google Group gke-security-groups@yourdomain.com
+
+To create a new role binding:
+```shell script
+gcloud iam service-accounts describe service-account-email
+> this outputs the unique-id of the service account
+
+kubectl create clusterrolebinding clusterrolebinding-name \
+  --clusterrole cluster-admin \
+  --user unique-id
+> Bind the clusterRole cluster-admin to the unique-id user
+```
+
 #### Configuring Kubernetes namespaces
+
+Namespaces are really important when multiple users and teams are working on the same cluster. It allows to group resource inside a namespace. A name of a resource needs to be unique inside a namespace, but not across. 
+
+It enables also to divide the cluster per users and define resource quotqs.
+```
+kubectl config set-context --current --namespace=<insert-namespace-name-here>
+> Specify the default namespace you use in your cluster
+```
 #### Defining workload specifications (e.g., resource requirements)
+
+It is considered a bad practice to run Kube containers without any limits or request restrictions. 
+```shell script
+spec.containers[].resources.limits.cpu
+spec.containers[].resources.limits.memory
+spec.containers[].resources.requests.cpu
+spec.containers[].resources.requests.memory
+```
+
+If you apply a limit, then Kubelet will enforce this limitation, and make sure the container does not consume more. If you apply a request, then Kubelet will let the container use more memory if the Node can provides more resources.
+
+The most commons resource type you can put limitation on are: CPU and Memory (RAM).
+
+* CPU: represents a unit of processing and are specified in units of Kubernetes units. In the Cloud, 1 CPU is equivalent to 1vCPU/Core.
+    * You can set value below 1. like 0.1 to have 100m (one hundred milliscpu) for your container
+* Memory: in unit of bytes. You can set value like 64Mi (2^64 bytes).
+
+As a Pod is the deployable unit, to have a full meaning, it is important to talk about Pod requests/limits that is the sum of all resources of its container.
+ 
+Example of configuration for 2 containers in a single pods
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: frontend
+spec:
+  containers:
+  - name: app
+    image: images.my-company.example/app:v4
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+  - name: log-aggregator
+    image: images.my-company.example/log-aggregator:v6
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+```
+
 #### Building a container image using Cloud Build
+
+To build a container image Container registry, you can use Cloud Build. This services provides a way to easily execute a `Dockerfile` file and send the created image to Container Registry.
+
+Here is the command to create an image from a Dockerfile:
+```shell script
+gcloud builds submit -t gcr.io/$DEVSHELL_PROJECT_ID/quiz-frontend ./frontend/
+```
+> `-t` is the image tag. If you want the image to be uploaded in your GCP project, provide your GCP_PROJECT_ID in the command line.
+>   * `gcr.io` is the URL of Container Registry.
+> The last parameter if the folder containing the Dockerfile file
+
 #### Configuring application accessibility to user traffic and other services
+
+To expose the application to user, you need to create **Services**. A service exposes a deployment in 4 different ways:
+* ClusterIP: Exposes the service on an internal IP in the cluster. Is not reachable from the outside, only the cluster
+* NodePort: Exposes the service on the same port of each selected Node in the cluster using NAT. Makes the service accessible from outside the cluster using <NodeIp>:<NodePort>. Superset of ClusterIP.
+* LoadBalancer: Creates an external LoadBalancer in the current cloud (if supported, like GCP) and assigns a fixed, external IP to the service. Superset of NodePost
+* ExternalName: Exposes the service using an arbitrary name (specified by the externalName in the spec) return the CNAME record with the name.
+
+With GKE, when using the `LoadBalancer`, it creates an external HTTP Load Balancer that exposes your deployment to the outside world with an IP address provided by Google.
+
 #### Managing container lifecycle
+
+A Pod lifecycle is as simple as this:
+* Pending phase: Is waiting for kube to start it. It is either in the scheduling queue, or starting its containers
+* Running phase
+    * All Pods in running phase are managed by kubelet and restarted if the pods it not matching the application requirements (meet the correct number of replicas for instance)
+* Succeeded or Failed phases depending on whether any container terminated in failure in the Pod
+
+A Pod is an ephemeral resources, that can be disposed at any time. If a Pod needs to migrate to a new Node, the current Pod is deleted and a new one is created. It is important to design them to be stateless, or with volumes configuration if you need.
+
+Pod runs Containers. Container states are:
+* Waiting: It is running operations it requires in order to complete start up (pulling container image, applying secret).
+* Running: It is executing without issues
+* Terminated: After execution, it ran to completion or failed for some reasons. Querying a Pod with Kubectl you can see the exit code and finish time for that container's period execution.
+
+You can create Hook on container phases:
+* PostStart: Hook executed after the Container is created. But, there is no guarantee the hook will run before the Container ENTRYPOINT. No parameters are passed to the handler.
+* PreStop: Hook called before a container is terminated due to an API request, or management event such as liveness probe failure, preemption, resource contention and others... No parameters are passed to the handler
+
 #### Define Kubernetes resources and configurations
 
+Kubernetes is based on:
+* **Nodes**, that are the workers, either physical or virtual. When starting a GKE cluster, the Nodes are the Compute engine instances created
+* **Pods**, that are the atomic unit of deployment. They represent a group of one or more application. Containers in a POD shares same IP address and port space. They run in the same context on the same Node.
+    * When creating a deployment, Kube crete a PODS with containers.
+    * containers in a Pods share storage as Volumes, Networking, and information about how to run each container.
+    * By default, a Pod is private. It can not be accessed from the outside world.
+* As a Pod is an ephemeral instance, it can be restarted. Sometimes, your container can tell to kubelet if it is still okay. Those are the **Probes**:
+    * Liveness probe: Whether a container is running. If this probe fails, kubelet kills the container, and the container is subjected to restart policy. Without liveness probe, the default State is success
+    * Readiness probe: Whether the container can handle requests. It the readiness probe fails, the endpoints controller removes the POD's IP address from endpoints of all Services that match the pod.
+    * startupProbe: Whether the application within the container is started. If this probe fails, the containers is subjected to restart policy.
+* Probes have different implementation:
+    * ExecAction: Executes the specified command inside the container (a shell script). Success if the command response code is 0.
+    * TcpSocketAction: perfomrs a TCP check agains the Pod's IP address. Success if the port is open
+    * HttpGetAction: Performs a Get request against the POd's IP address on a specified port and path. Success if response code is >= 200 and < 400
+* **RestartPolicy**:  A container restart policy indicates what are the conditions to restart a container. Possible values are Always (default), OnFailure and Never. It applies to all containers within the POD.
+* **Services**: Abstraction which defines a logical set of Pods and a policy by which to access them. It enables a loose couplng between dependent Pods. Indeed, if your app1 depends on app2, and app2 is deployed across multiple pods, you can't refer to the app2 IP addresses to communicate. Use a Service to expose app2 through a single IP address, and the service will dispatch the request according the policy and pods states.
+    * ClusterIP: Exposes the service on an internal IP in the cluster. Is not reachable from the outside, only the cluster
+    * NodePort: Exposes the service on the same port of each selected Node in the cluster using NAT. Makes the service accessible from outside the cluster using <NodeIp>:<NodePort>. Superset of ClusterIP.
+    * LoadBalancer: Creates an external LoadBalancer in the current cloud (if supported, like GCP) and assigns a fixed, external IP to the service. Superset of NodePost
+    * ExternalName: Exposes the service using an arbitrary name (specified by the externalName in the spec) return the CNAME record with the name.
+    * To match a set of Pods, services use Labels and selectors. Labels are key/value pair attached to objects.
+* **Scaling**: the purpose of kubernetes is to provide autoscaling behavior for your pods to make sure your application can deliver and handle request even if there is a peak load.
+* **ReplicasSet**: the objects that enables the autoscaling.
+* **RollingUpdates**: Updates your application in a transparent way for your users, by updating the application pod after pod.
+    * It requires more than 1 instance in order to work.
+    * You can also configure the number/percentage of pods unavailable during the update.     
+    
 ### 3.4 Deploying a Cloud Function. Considerations include:
 
 #### Cloud Functions that are triggered via an event from Google Cloud services (e.g., Pub/Sub, Cloud Storage objects)
