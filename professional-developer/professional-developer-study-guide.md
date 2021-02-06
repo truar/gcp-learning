@@ -100,7 +100,7 @@ Typical use cases for BigTable:
 * Internet of Things data, such as usage reports from energy meters and home appliances.
 * Graph data, such as information about how users are connected to one another.
 
-Cloud BigTable stores Rows. Each row are indexed with a Row. A Row contains multiple Column, group into a Family. A column name must be unique inside a column family. BigTable is sparsed, which means empty cell does not take space in memory. Column family and column can be added on the fly, without much effort.
+Cloud BigTable stores Rows. Each row are indexed with a RowKey. A Row contains multiple Column, group into a Family. A column name must be unique inside a column family. BigTable is sparsed, which means empty cell does not take space in memory. Column family and column can be added on the fly, without much effort.
 
 By design, the rowkey is the most important part to ensure an even distribution of the workload. To properly design a rowkey, you need to know the query you will perform on your data.
 Most efficient queries are query using :
@@ -109,7 +109,7 @@ Most efficient queries are query using :
 * Range of row keys by starting and ending rowkeys.
 
 Cloud BigTables stores data lexicographically, which means 3 > 20, but 20 > 03.
-* The Rowkey is composed of multiple value. MAke sure you use a proper rowkey separator 
+* The Rowkey is composed of multiple value. Make sure you use a proper rowkey separator 
 * So, if you store integer in your RowKey, pad with leading zeroes.
 * Also, a rowkey should be short : 4Kb. Larger keys results in lower performance
 * Design the rowKeys to retrieve a well-defined range of rows
@@ -461,7 +461,7 @@ To have more info, see "Defining a key structure for high-write applications usi
 
 ##### Cloud BigTable
 
-The key point is to understand that a schema in BigQuery is designed for the query you plan to use. See "Defining a key structure for high-write applications using Cloud Storage, Cloud Bigtable, Cloud Spanner, or Cloud SQL" to have more information regarding rowkey.
+The key point is to understand that a schema in BigTable is designed for the query you plan to use. See "Defining a key structure for high-write applications using Cloud Storage, Cloud Bigtable, Cloud Spanner, or Cloud SQL" to have more information regarding rowkey.
 
 BigTable is:
 * A Key/Value storage system
@@ -925,7 +925,7 @@ An instance records all audit logs. Audit logs are available in the Logs Viewer.
 * System event logs: system maintenance on Compute engine resources
 * Data access logs: Read-only operation on Compute engine resources, like get, list... It logs ADMIN_READ logs, and DATA_READ or DATA_WRITE logs, unlike Cloud Spanner, Storage or BigTable.
 
-With Stackdriver, you can also have a centralized view and create dashboard about your compute engine resources. For that, you need to install stackdriver agents on your Compute engine instance:
+With Stackdriver, you can also have a centralized view and create dashboards about your compute engine resources. For that, you need to install stackdriver agents on your Compute engine instance:
 ```shell script
 curl -sSO https://dl.google.com/cloudagents/add-monitoring-agent-repo.sh
 sudo bash add-monitoring-agent-repo.sh
@@ -1221,24 +1221,239 @@ Kubernetes is based on:
     
 ### 3.4 Deploying a Cloud Function. Considerations include:
 
+Cloud functions are the most serverless solution in GCP. You just to write codes in one of the CloudFunctions supported languages and versions:
+* Node.js Runtime
+* Python Runtime
+* Go Runtime
+* Java Runtime
+* .NET Runtime
+* Ruby Runtime
+
+With the proper dependencies, you can then have a Function executed based on different triggers.
+
+Be careful with Functions. Like Cloud Run, the CPU is allocated only when the corresponding event is received, and stops immediatly after the function completion. Do not start async task without waiting for its completion, or it might never be completed.
+
 #### Cloud Functions that are triggered via an event from Google Cloud services (e.g., Pub/Sub, Cloud Storage objects)
+
+Cloud functions can be triggered with internal event in GCP. Among this event, you can have a PubSub message received in a Topic, or on a Cloud Storage objects.
+
+Example for a PubSub Topic:
+```shell script
+# create a topic
+gcloud pubsub topics create YOUR_TOPIC_NAME
+# Deploy the function
+gcloud functions deploy java-pubsub-function \
+--entry-point functions.HelloPubSub \
+--runtime java11 \
+--memory 512MB \
+--trigger-topic YOUR_TOPIC_NAME
+# publish a message
+gcloud pubsub topics publish YOUR_TOPIC_NAME --message YOUR_NAME
+```
+
+When you want to respond to an event on a bucket:
+* google.storage.object.finalize (default): when an object is successfully written to Storage
+* google.storage.object.delete: When the object is deleted, very handy to manage non-versioning bucket. Works also if a file is overriden
+* google.storage.object.archive: Only used in versioning bucket. Triggered when an old version is archived
+* google.storage.object.metadataUpdate: update when objects metadata are updates
+
+You can configure a Function to listen for a specific Bucket event.
+> Note: Cloud Functions can only be triggered by Cloud Storage buckets in the same Google Cloud Platform project.
+
+Under the hood, the event is propagated to the Function using PubSub. The JSON message received from PubSub for a Bucket event is structured and gives you a lot of metadata (but you not have the file in the message).
+
+Here is an example:
+```shell script
+# create a bucket
+gsutil mb gs://YOUR_TRIGGER_BUCKET_NAME
+# deploy the function to be triggered for google.storage.object.finalize event
+gcloud functions deploy java-gcs-function \
+--entry-point functions.HelloGcs \
+--runtime java11 \
+--memory 512MB \
+--trigger-resource YOUR_TRIGGER_BUCKET_NAME \
+--trigger-event google.storage.object.finalize
+# just upload a file to your bucket
+gsutil cp gcf-test.txt gs://YOUR_TRIGGER_BUCKET_NAME
+```
+
 #### Cloud Functions that are invoked via HTTP
+
+Cloud Functions can ba triggered by an external event like an HTTP request. You can create one function that will respond to one specific endpoints for your application.
+
+I'd recommend not developing real applications with many endpoints split on several Cloud Functions, but it can be handy in some CRUD, administrative operations.
+
+```shell script
+# Deploy a function (your code is responsible to know what request to handle
+gcloud functions deploy FUNCTION_NAME --runtime nodejs10 --trigger-http --allow-unauthenticated
+# Trigger the call
+curl -X POST "https://YOUR_REGION-YOUR_PROJECT_ID.cloudfunctions.net/FUNCTION_NAME" -H "Content-Type:application/json" --data '{"name":"Keyboard Cat"}'
+```
+
+> Note here is `--allow-unauthenticated` which indicates the Function is publicly accessible. It is not always the case.
+
 #### Securing Cloud Functions
+
+To secure a Cloud Function, you can configure identity-based or network based access control.
+
+With Identity-based access control you can restrict the Function API for:
+* developer: creating, updating or deleting a Cloud Function
+* User: Restrict function invocation.
+
+```shell script
+gcloud functions add-iam-policy-binding FUNCTION_NAME \
+  --member=MEMBER_TYPE \
+  --role=ROLE
+```
+
+Besides, there is a lot of possibilities to authenticate someone using your Functions:
+* Developers (function invocation based on IAM roles)
+* Function-to-function (using dedicated service account with proper IAM roles to invoke another function)
+* End users:
+    * using Google Sign-in ()
+    * using Firebase token (with a verification made by the firebase admin SDK)
+        * Beware of CORS configuration when authenticating the user on a different host name. You might need to open your function publicly, or using cloud endpoint 
+* API Keys
+
+
+With network-based access control, you can control over the network ingress and egress to and from your functions.
+
+Lastly, you also need to provide a dedicated service account for your Cloud Function (like for any other services running on GCP) to make sure the function does not have access to unwanted resources (like a database).
+
 
 ### 3.5 Using service accounts. Considerations include:
 
 #### Creating a service account according to the principle of least privilege
+
+Service accounts are used to authenticate anything that is not a human (a service). You can find service Account on GCE instances, GKE instances and PODS, Cloud Run, AppEngine and Cloud Functions. 
+
+The service account is made to authenticate service to service (like two instances talikng together), or a service talking to a Database.
+
+The principle of least privileges ensured your service will not have unnecessary access to others services. By default, your instances run with a default account (one for each kind of runners) with the role Editor. Very handy when developing, could be dangerous in production. 
+
 #### Downloading and using a service account private key file
 
+To be a service account, you need to download and use its private key. To download it, do :
+```shell script
+gcloud iam service-accounts keys create ~/key.json \
+  --iam-account sa-name@project-id.iam.gserviceaccount.com
+```
+
+The key needs to be created. Once created, it can not be retrieved, you will need to create a new one.
 
 ## Section 4: Integrating Google Cloud services
 
 ### 4.1 Integrating an application with data and storage services. Considerations include:
 
 #### Read/write data to/from various databases (e.g., SQL)
+
+Reading/Writing from various SQL databases is done by executing an SQL query. The most basic thing is the SQL query. To do that, you first need to establish a connection with the database (URL, USER and PASSWORD).
+
+* SELECT query are used to read data.
+* INSERT/UPDATE/DELETE are used to write data
+
+Nowadays, most framework uses an ORM layer so that the object are mapped automatically into a Relational Databases. The most famous one is hibernate, and it is also provided by Spring for a Java Application.
+
+But under the hood, the ORM is simply executing SQL queries.
+
+You can also use a Document oriented databases, like MongoDB, or a Graph databases, like Neo4J... Those stores data differently. Some allow SQL lite query, others only from API call...
+
 #### Connecting to a data store (e.g., Cloud SQL, Cloud Spanner, Firestore, Cloud Bigtable)
+
+##### Cloud SQL
+
+Cloud SQL is the SQL data store provided by Google. To connect to it, you have different possibilities:
+* How to connect: 
+    * Internal, VPC only (private) IP address
+    * External Public IP address
+* How to authorize: 
+    * Cloud SQL Proxy and Cloud SQL language connectors: IAM based access
+    * Self-managed SSL/TLS certificates: only connections based on specific public keys
+    * Authorize networks: authorized list of IP addresses
+* How to authenticate:
+    * Native database authentication: username/password set in the database engine
+    
+Of course, the recommendations are:
+* Prefer Private address
+* If not possible, use SSL/TLS certificate
+* Configure wisely your network if you open your database
+* If you host your application on premise and the database on GCP, try using Cloud SQL proxy with a private address for the database. The proxy will handle the connection to your private Cloud SQL instance.
+
+Example of sql proxy usage:
+```shell script
+./cloud_sql_proxy -instances=<INSTANCE_CONNECTION_NAME>=tcp:3306
+```
+
+Spring cloug gcp provides way to communicate with the Cloud SQL instance, by using properties.
+    
+##### Cloud Spanner
+
+GCP provides different supports for various technologies. To connect to Spanner, you can one of the libs provided by Google, or you can also use the `gcloud` tool. 
+
+Authentication and Authorization are managed with OAuth2. You can configure which user has access to what using IAM roles and assigning users to a database. You have different levels of permissions:
+* Project level: impact all Spanner instances
+* Instance level: impact all databases in the Spanner instance
+* Database level: impact only a specific database in a specific spanner instance.
+
+##### Firestore
+
+Once again, GCP provides support for various technologies. To connect to a Firestore database, you have to use IAM users and roles. You can define specific roles for a IAM user. Besides, the IAM is granted roles to write or read data in the application. But careful, datastore does not enforce restriction on specific entities for specific users. The access granted to a user are granted for all Firestore in Datastore mode. Your application is responsible for ensuring user have access to the entity or the data it requests.
+
+It is possible to do that with Firestore in Native mode using its custom RBAC.   
+
+##### Cloud Bigtable 
+
+BigTable supports the HBase API. To connect to BigTable, you need to create a Connection object, and share it accross your thread in your application.
+
+You can provide project information in 2 ways to connect to BigTable:
+* include settings in code
+* Use the hbase-site.xml file
+
+In both cases, you need to provide:
+* the PROJECT_ID
+* the INSTANCE_ID
+* the APP_PROFILE_ID (only if using app profiles)
+
+To connect, it requires a user or a service account. You can configure the user access at project, instance and table levels.
+
+You can't grant access to AllUsers or AllAuthenticatedUsers, it is forbidden.
+
+##### Notes
+It seems to me that only Cloud SQL works differently from the others storages system. Apart from CloudSQL, they are integrated with IAM roles.
+
+Cloud SQL uses a proxy to securely handle the connection, the others uses natively a secured protocol (SSL).
+Datastore/firestore does not provide easy way to manage rights for a certain entity. 
+CloudSpanner and Cloud BigTable supports fine-grained roles for their object (databases, tables)
+Cloud SQL supports fine-grained access using MySQL users and roles management.
+
 #### Writing an application that publishes/consumes data asynchronously (e.g., from Pub/Sub)
+
+In any system hosting microservices, at some point, you will need to send data asynchronously. There can be different reason:
+* Sending an event to notify other system
+* Tracing and monitoring, without impacting the end users
+* Using the messaging system as a circuit breaker
+
+Any application can publish data to PubSub. This messaging system exposes a REST API callable by any system able to send HTTP requests (anyone). GCP provides different APi for different languages to interact with Cloud PubSub.
+
+As always, you can configure using IAM who can use PubSub:
+* managing topics
+* publishing to a topic
+* Reading from a subscription
+* ...
+
+For this use case, the application needs to support background actions, in order to fetch data from a subscription on a regular basis, to perform the action needed when receiving an event.
+
+When reading a message from a subscription, the application must ACK the correct reception of the message (once again, using the PubSub API). 
+
+Also, for some use cases, PubSub can PUSH a request to an endpoint (which can be protected for a TOKEN of a user account). The endpoint has to respond an HTTP Response. It the request is correct, it sends a code 2XX, ACK the message and telling PubSub not to send it again. Or, 4/5XX in case of error. In this case, PubSub will send the message again.
+
 #### Storing and retrieving objects from Cloud Storage
+
+Once again, use one of the APIs provided by GCP to read and write data from Cloud Storage. You can easily use `gsutil` to read data from Cloud Storage:
+```
+gsutil cp gs://BUCKET/OBJECT DESTINATION
+gsutil cp SOURCE gs://BUCKET/OBJECT
+```
 
 ### 4.2 Integrating an application with compute services. Considerations include:
 
