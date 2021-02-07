@@ -1458,7 +1458,28 @@ gsutil cp SOURCE gs://BUCKET/OBJECT
 ### 4.2 Integrating an application with compute services. Considerations include:
 
 #### Implementing service discovery in GKE and Compute Engine
+
+Service discovery is a mechanism to automatically detect and add nodes to a network. This remove the burdens of user configuration of a cluster.
+
+To implement a Service Discovery, you need to access GCP resources metadata (configuration data), for GCE or GKE. Those metadata are IPs addresses for instances, or VM name, or a label...
+
+When creating a LoadBalancer for a Managed Instance Group, behind the scene, a service discovery is used to handle VM add or removal automatically. To do that, the LoadBalancer and the Instance groups use Health Check to check if an instance is still alive.
+
+My guess is that many GCP services queries the GCE/GKE metadata to know there IP addresses and being able to redirect properly the request to a running server. And if a VM gets shutdown, the service discovery updates its internal metadata and do not request the stopped VM after.
+
+For GKE, the service discovery is handled by Service, where you can target a set of pods based on their label for instance. 
+
+The service registry can be based on label (like labels applied to a GCE instance, like http-server, or database, or background-tasks...). Those labels can be used to filter more specifically what VMS to put behind a LoadBalancer for instance.   
+
+TODO: READ this: https://cloud.google.com/compute/docs/storing-retrieving-metadata?hl=en
+
 #### Reading instance metadata to obtain application configuration
+
+* Reading
+```
+gcloud compute instances describe to-be-deleted --zone=us-central1-a
+```
+
 #### Authenticating users by using OAuth2.0 Web Flow and Identity-Aware Proxy
 #### Authenticating to Cloud APIs with Workload Identity
 
