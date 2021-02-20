@@ -21,7 +21,7 @@ IAAS: Infrastructure as a service. The provider provides infrastructure, like vi
 * You also have to create everything yourself, like autoscaling and other applicative stuff.
 
 CAAS: Container as a service. Run your container without managing the underlying server. Google Kubernetes Engine is an example of CAAS. Based upon Kubernetes to manage your containers in a cluster of machines managed by Google.
-* You do not control the underlying VM, but with Kubernetes, you have a more fine-grained control over your deployments. Of course, you need to manage yourself your Deployments upgrades in version, the communication inside your cluster, the exposition of your application using HTTP Load Balancer...
+* You do not control the underlying VM, but with Kubernetes, you have a more fine-grained control over your deployments. Of course, you need to manage yourself your Deployments upgrades, the communication inside your cluster, the exposition of your application using HTTP Load Balancer...
 
 PAAS: Platform As a Service. Run your application easily without any server management. AppEngine is an example of PAAS.
 * You focus only on the code, and with light configurations (.yml file) you can configure autoscalings for your application
@@ -40,18 +40,19 @@ The selection of a region or a zone can affect latency depending on the location
 
 Cloud Storage is the storage system to store binary object, like file. It is not a Database, nor a FileSystem. 
 
-Upload and download files with similarities to a FS. A bucket has limited capabilities:
+Upload and download files with similarities to a FileSystem. A bucket has limited capabilities:
 * Writes: 1000 objects write per second (uploading, updating and deleting objects)
 * Reads: 5000 objects reads per second (listing objects, reading object data and metadata)
+
 A bucket is designed for autoscalability. By default, with the rates specified above, you can write up to 2.5Pb and read 13Pb in a month for 1Mb objects.
 
-If your application goes beyond those needs, you can increase the IO by ramping up your application. By by matching the default rate, and then ramp up every 20 minutes by doubling the request rate.
+If your application goes beyond those needs, you can increase the IO by ramping up your application. By matching the default rate, and then ramp up every 20 minutes by doubling the request rate.
 
 In case of high-write applications, like dataflow process, you might faced some latency, contention or even errors if your buckets are not properly designed.
 
 In a bucket, the objects are indexed by Google to distribute the workloads across the different servers. If your objects key are in small range, then you increase the risk of Contention. Hopefully, Google detects such case and redistribute the loads across others available servers.
       
-Avoid using keys based on sequential information or timestamp. Those are no good choice to ensure a even distribution loads across your servers. Make sure to include some randomness in the object key to ensure an even distribution.
+Avoid using keys based on sequential information or timestamp. Those are no good choice to ensure an even distribution loads across your servers. Make sure to include some randomness in the object key to ensure an even distribution.
 
 Example:
 * This is bad because you use a timestamp information to build the object key. 
@@ -100,9 +101,10 @@ Typical use cases for BigTable:
 * Internet of Things data, such as usage reports from energy meters and home appliances.
 * Graph data, such as information about how users are connected to one another.
 
-Cloud BigTable stores Rows. Each row are indexed with a RowKey. A Row contains multiple Column, group into a Family. A column name must be unique inside a column family. BigTable is sparsed, which means empty cell does not take space in memory. Column family and column can be added on the fly, without much effort.
+Cloud BigTable stores Rows. Each row are indexed with a RowKey. A Row contains multiple Column, grouped into a Family. A column name must be unique inside a column family. BigTable is sparsed, which means empty cell does not take space in memory. Column family and column can be added on the fly, without much effort.
 
 By design, the rowkey is the most important part to ensure an even distribution of the workload. To properly design a rowkey, you need to know the query you will perform on your data.
+
 Most efficient queries are query using :
 * the row key exactly
 * The prefix of the row key. Avoid finding elements where the attribute your are looking for is in the middle of the row key, this will cause major latency (alos known as FullTable scans)
@@ -110,7 +112,7 @@ Most efficient queries are query using :
 
 Cloud BigTables stores data lexicographically, which means 3 > 20, but 20 > 03.
 * The Rowkey is composed of multiple value. Make sure you use a proper rowkey separator 
-* So, if you store integer in your RowKey, pad with leading zeroes.
+* If you store integer in your RowKey, pad with leading zeroes.
 * Also, a rowkey should be short : 4Kb. Larger keys results in lower performance
 * Design the rowKeys to retrieve a well-defined range of rows
 
@@ -132,14 +134,14 @@ RowKeys to avoid
 
 ##### Cloud Spanner
 
-Cloud Spanner is used to handle Relational Databases in a very demanding environment, where the clients needs high-writes. It is very similar to a relational database, in which you define your tables containing columns and primary keys.
+Cloud Spanner is used to handle Relational Databases in a very demanding environment, where the clients need high-writes. It is very similar to a relational database, in which you define your tables containing columns and primary keys.
 
-Usually, in a classic RDBMS, you define relationships in your tables. Those relationships are created using Foreign Keys, used to join table together. To provide better performance, Cloud Spanner adds the feature of "interleaved tables" where you define a relationships between tables not by foreign key, by by sharing the primary of the parent table. It is like a parent/child relationships. Cloud Spanner stores "interleaved tables" data differently by using the same physical storage to group the data together. In term of storage, the child data is stored between two parents rows. Child data must share the exact same column in the exact same order as the PK of the parent table.
+Usually, in a classic RDBMS, you define relationships in your tables. Those relationships are created using Foreign Keys, used to join table together. To provide better performance, Cloud Spanner adds the feature of "interleaved tables" where you define a relationship between tables not by foreign key, but by sharing the primary of the parent table. It is like a parent/child relationships. Cloud Spanner stores "interleaved tables" data differently by using the same physical storage to group the data together. In terms of storage, the child data is stored between two parents rows. Child data must share the exact same column in the exact same order as the PK of the parent table.
 
 Primary keys:
 * are automatically indexed and sorted alphabetically.
 * contains as many columns as needed
-* Must NOT be a basic auto-increment integer as it creates a HotSpot. Indeed, Spanner divided data based on key range... If you have an auto-increment value, then your data will always be redirected to the same node, until the key range is fullm and then going onto the next one..
+* Must NOT be a basic auto-increment integer as it creates a HotSpot. Indeed, Spanner divided data based on key range... If you have an auto-increment value, then your data will always be redirected to the same node, until the key range is full and then going onto the next one..
 
 PK best practices:
 * Hash the key and store it into a single column
@@ -151,7 +153,6 @@ Good things to know:
 * Schema design best practice #1: Do not choose a column whose value monotonically increases or decreases as the first key part for a high write rate table.
 * Schema design best practice #2: Use descending order for timestamp-based keys.
 * Schema design best practice #3: Do not create a non-interleaved index on a high write rate column whose value monotonically increases or decreases.
-
 
 ##### Cloud SQL
  
@@ -166,7 +167,7 @@ To design CloudSQL for high writes, the solution will be in the architectural ch
 To manage a User session (i.e data related to a user for the time he is using the application) you can use different features:
 * An External Load balancer has a *session affinity* configuration, to dispatch the client in the same backend server
 
-Session are usually managed at the application level. If the application is specific to a single application, then, in case of scalability, you need to make sure the client will always be redirected to the same server. To do that, you can use an External Load balancer with a  *session affinity* configuration, to dispatch the client in the same backend server.
+Sessions are usually managed at the application level. If the session is specific to a single application, then, in case of scalability, you need to make sure the client will always be redirected to the same server. To do that, you can use an External Load balancer with a  *session affinity* configuration, to dispatch the client in the same backend server.
 
 You could also lever some GCP databases solution to handle such a use case. 2 databases might fit your needs:
 * Memory store: blazing fast redis in memory database to store and handle data.
@@ -181,7 +182,7 @@ To use the CDN, you need to configure an external Load Balancer with a SSL certi
 
 #### Deploying and securing API services
 
-Basically, you can deploy any application, either using a PAAS solution, a CAAS or a IAAS. To access your service, you need loadBalancer (most of the times) to gives your application a public name outside users can use. Sometimes, to accomodate company policy or others constraints, like progressive service migration, you might want to use an API gateway, that serves as a Proxy to ensure the request is handled by the correct service. Of course, an API does more, like monitoring the activity, configuring security access or defining the API mapping based on OpenAPI specification for instance.
+Basically, you can deploy any application, either using a PAAS solution, a CAAS or a IAAS. To access your service, you need loadBalancer (most of the times) to gives your application a public name outside users can use. Sometimes, to accommodate company policy or others constraints, like progressive service migration, you might want to use an API gateway, that serves as a Proxy to ensure the request is handled by the correct service. Of course, an API does more, like monitoring the activity, configuring security access or defining the API mapping based on OpenAPI specification for instance.
 
 Regarding securities, you don't want your API to be accessible publicly. Here again, API gateway can be very handy to help configuring API restriction. 
 
@@ -205,17 +206,17 @@ Cloud Apigee is a platform for developing and managing API proxies. The purpose 
 * Fault handing
 * And so more
 
-From all API management solutions, this one seems to be the more complete with the more possibilities. But you might have less freedom for others aspects (?)
+From all API management solutions, this one seems to be the more complete with the more possibilities.
 
 ##### API gateway
 
-Provides a secure access to services through a well-defined REST API that is consistent across your services.
+Provides secured access to services through a well-defined REST API that is consistent across your services.
 * Easy app consumption for developers
 * Change the backend implementation without affecting the public API
 * Scaling, monitoring and security features built in.
 
 To configure the security, you can use:
-* API keys: restrict access to specific methods or all methods in an API. To authenticate to a Gateway using an API key, provide the key as query param. Access public data anonymously
+* API keys: restrict access to specific methods or all methods in an API. To authenticate to a Gateway using an API key, provide the key as query param. Access public data anonymously.
 * GCP service accounts: Access private data on behalf of an end user
 * Google ID tokens: A JWT that contains the OpenID connect fields needed to identify a Google user.
 
@@ -228,7 +229,7 @@ Endpoints is similar to API gateway in term of API management, security configur
 Your microservices might need to communicate asynchronously with each other. Sending this kind of message can be carried by the GCP Pub/Sub solution. An asynchronous message system based on :
 * TOPICS: where the clients will push the message
 * SUBSCRIPTIONS: reads message fron the TOPIC. There is 2 kinds of subscriptions:
-    * PULL: the most common, where the client pulles the message in the subscriptions.
+    * PULL: the most common, where the client pulls the message in the subscriptions.
         * Be careful, you can't pull with CloudRun, as Cloudrun runs only when an HTTP request enters 
     * PUSH: where PubSub pushes the message to an endpoint manages by one of your service
         * When pushing, consider security issue. You can ask PubSub to use a token that will be sent to your server in the "AUTHORIZATION" header. Then, either your server knows how to handle the token, or you configured your application to accept a GCP service account token.
@@ -261,11 +262,11 @@ AppEngine sends a ` /_ah/stop` request to your application, which has now 30 sec
 When your Compute Engines receives a Termination command, it executes the shutdown script configured by the user when it creates the instance or the Managed Group:
 * If the application receives the `instances.delete` or `instances.stop` request
 * When your compute engine is preemptible
-* When the user manuallu shutdown or reboot the VM, like `sudo shutdown` or `sudo reboot`
+* When the user manually shutdown or reboot the VM, like `sudo shutdown` or `sudo reboot`
 * Using the gcloud CLI
 But it will not be run (the shutdown scripts) if the application receives `instances.reset`
 
-Of course, it works the samy if your instance is part of a Managed Instance Groups and you configured an autoscaling behavior.
+Of course, it works the same if your instance is part of a Managed Instance Group and you configured an autoscaling behavior.
 
 #### Google-recommended practices and documentation
 https://cloud.google.com/docs
@@ -277,11 +278,11 @@ https://cloud.google.com/compute/docs/instance-groups
 
 #### Implementing requirements that are relevant for applicable regulations (e.g., data wipeout)
 
-When designing an application, it is important to take into consideration the security principles that must be applied for the audience you are targeting. Most of the regulations are not addressed only by Google. Indeed, security regulations is a shared responsabilities between you and Google, where you need to do your part of the job.
+When designing an application, it is important to take into consideration the security principles that must be applied for the audience you are targeting. Most of the regulations are not addressed only by Google. Indeed, security regulations is a shared responsability between you and Google, where you need to do your part of the job.
 
 ##### ISO/IEC 27001
 
-Google is certified ISO/IEC 27001 that helps organization keep their information asset secure. It provided a set of best practices, requirement for Information Security System (IMS) and details security controls.
+Google is certified ISO/IEC 27001 that helps organization keep their information asset secure. It provides a set of best practices, requirement for Information Security System (IMS) and details security controls.
 
 ##### HIPAA
 Health Insurance Portability and Accountability Act of 1996 is a law that establishes data privacy and security requirements for organizations that are charged with safeguarding individuals protected health information (PHI). 
@@ -289,7 +290,7 @@ Health Insurance Portability and Accountability Act of 1996 is a law that establ
 ##### GDPR
 Defines a set of regulations to protect data regarding one individual for EU citizens.
 
-The MOST important part here is to realize security is a shared responsabilities and you as a developer must take action in order to fulfill the applicable regulations
+The MOST important part here is to realize security is a shared responsability and you as a developer must take action in order to fulfill the applicable regulations
 
 #### Security mechanisms that protect services and resources
 https://cloud.google.com/docs/authentication/#service_accounts
@@ -301,7 +302,7 @@ To prevent access to your services and resources, you need to configure IAM. IAM
 * You must follow the principle of least privileges when assigning rights, which means to need grant more than the member needs to perform its actions
 * Members can be added to a group. Groups are used to managed more easily the different rights.
 
-When we talk about users in GCP, we identify differents members:
+When we talk about users in GCP, we identify different members:
 * Service account: To authenticate a GCP resources or services
 * Google Account: to authenticate an end user (with password, or SSO...)
 * Google group: to group members inside the same group (like function, or profile to more easily managed company policies)
@@ -319,7 +320,7 @@ It analyses the layer your image is based on and generates a report with differe
 #### Storing and rotating application secrets and keys (e.g., Cloud KMS, HashiCorp Vault)
 
 ##### Key Management System
-Any GCP users can use their custom security keys using KMS (Key management system). A KMS is store that contains all user-supplied and google-managed cryptographic key.
+Any GCP users can use their custom security keys using KMS (Key management system). A KMS is a store that contains all user-supplied and google-managed cryptographic key.
 
 In KMS, you can store symmetric and asymmetric key.
 
@@ -380,10 +381,10 @@ Don't forget, your compute engine instance needs to be available for remote TCP 
 Authenticating a GCP services a available with:
 * An application default credentials. If your services need to access another GCP services, then the application will lookup for a  `GOOGLE_APPLICATION_CREDENTIALS` environment variable containing the credentials information. 
     * By default, every Google Services have a service account with Editor Role (to be validated if ALL default account are EDITOR). But the best practices would be to create a specific service account and restrict access to unnecessary services/resources.
-* Tje OAuth 2.0 protocol, you can authenticate an end user to access your services. This is useful if you need to know the end user accessing the resources
+* The OAuth 2.0 protocol, you can authenticate an end user to access your services. This is useful if you need to know the end user accessing the resources
 * An API Key, handy when the resources is protected and you don't need to know the identity of the users/services accessing the resources.
 
-To authenticate an end user, but more freely, with no restriction to the IAM configuration, you can also use the Cloud Identity Platform services, you can also authenticate end users with a JWT token. The request is sent with the Firebase admn SDK to the authentication service, a JWT is sent to the user, which passes it to the resources server. The server asks firebase if the token is valid to grant access to the resources.
+To authenticate an end user, but more freely, with no restriction to the IAM configuration, you can also use the Cloud Identity Platform services to authenticate end users with a JWT token. The request is sent with the Firebase admin SDK to the authentication service, a JWT is sent to the user, which passes it to the resources server. The server asks firebase if the token is valid to grant access to the resources.
 
 https://cloud.google.com/docs/authentication
 
@@ -402,7 +403,7 @@ Within an organization, you can define roles to users on the organization or fol
 
 You can create your own roles if needed, by assembling permissions together. Those roles are called `custom role`
 
-The previous version of IAM os still working, where you find 3 `basic roles`:
+The previous version of IAM is still working, where you find 3 `basic roles`:
 * VIEWER : Read action that do not affect state
 * EDITOR : VIEWER + changing existing states (adding resources, updating, deleting...)
 * OWNER : EDITOR + Roles management + Billing management
@@ -415,21 +416,19 @@ A service mesh is an infrastructure layer built with your application to manage,
 
 In your entire infrastructure, you can have as many service mesh as you have applications. All meshes together creates a mesh metwork.
 
-Kubernetes comes with a service mesh, called Istio, to manage services to services communication. I guess (needs to check) that Istio is responsible for mapping the service name your service calls to send the requet to the correct PODS. Besides, with the kubernetes network policy, you can define what services can be sent to a specific pod. You also have kubernetes namespace to isolate pod together by grouping them to form a cluster logically connected together. If you want to talk to another namespace, you need to use its public HTTP entry point.
-
---> Training kube might be a good idea
+Kubernetes comes with a service mesh, called Istio, to manage service to service communication. I guess (needs to check) that Istio is responsible for mapping the service name your service calls to send the request to the correct PODS. Besides, with the kubernetes network policy, you can define what services can communicate with a specific pod. You also have kubernetes namespace to isolate pod together by grouping them to form a cluster logically connected together. If you want to talk to another namespace, you need to use its public HTTP entry point.
 
 #### Running services with least privileged access (e.g., Workload Identity)
 
-It is a best practice to ensure your application runs with the least privilege it needs to success in its task. By default, a GCP service has EDITOR basic roles. It is always good to create a specific service accunt for a specific Workloads with the minimal roles.
+It is a best practice to ensure your application runs with the least privilege it needs to success in its task. By default, a GCP service has EDITOR basic roles. It is always good to create a specific service account for a specific Workload with the minimal roles.
 
 Like when running a service in Cloud Run, you can also configure the service account for a Compute engine instance (at creation), when using GKE and running PODS, or even with App Engine (for a specific services ?)  
 
 #### Certificate-based authentication (e.g., SSL, mTLS)
 
-To access a GCP services with a LoadBalancer, you can use Google managed certificate or your own custom certificate. When requesting a server, if HTTPS is used, the client will encrypt the request the public key of the target server. The public key is managed by central organization that contains all public key for a specific websites. The request is then decrypted by the server with its private key. For websites, everybody has access to the server public key.
+To access a GCP services with a LoadBalancer, you can use Google managed certificate or your own custom certificate. When requesting a server, if HTTPS is used, the client will encrypt the request with the public key of the target server. The public key is managed by central organization that contains all public key for websites. The request is then decrypted by the server with its private key. For websites, everybody has access to the server public key.
 
-For an internet, the public key might not be known by global organization. In this case, you need to configure your client to add the public key (certificate) into your machine to encrypt data sent to the server (and also using the client private key to decrypt the data).
+For an intranet, the public key might not be known by global organization. In this case, you need to configure your client to add the public key (certificate) into your machine to encrypt data sent to the server (and also using the client private key to decrypt the data).
 
 A LoadBalancer can have multiple SSL certificates. The client can specify what certificates to use.
 Using SSL is a way to ensure a secured communication, but you can not know the identity of the caller. For this, you need to use Google Authentication solutions.
@@ -467,7 +466,7 @@ BigTable is:
 * A Key/Value storage system
 * Only the RowKey is indexed (which explain why you need to think query first, unlike a RDBMS system where you can add more indexes)
 * Rowkeys are sorted lexicographically
-* Group column into a Column fa;ily
+* Group column into a Column family
 * Column in a Column family are sorted in lexicographic order
 * All operations are atomic on a RowLevel
 * Intersection of Row + Column can contain multiple timestamped cells (a unique version of the data)
@@ -476,7 +475,7 @@ BigTable is:
 
 ##### Cloud SQL
 
-RDBMS system. Just rely on Cloud Spanner, both are equivalent on term of Schema. Just notice in classic RDBMS, you can not have interleaved table, you can only express table relationships with Rowkey. Just like any other system, you can create index on some column, groups of colums. Define also Primarey key (automatically indexed).
+RDBMS system. Just rely on Cloud Spanner, both are equivalent on term of Schema. Just notice in classic RDBMS, you can not have interleaved table, you can only express table relationships with Foreign Key. Just like any other system, you can create index on some column, groups of colums. Define also Primarey key (automatically indexed).
 
 #### Choosing data storage options based on use case considerations, such as:
 ##### Time-limited access to objects
@@ -500,11 +499,11 @@ Keep in mind:
 
 ##### Structured vs. unstructured data
 
-Structured data are data you can store in GCP databse service as Spanner, BigTable, SQL or Firestore. Indeed, when storing those data, you transform the unstructured input into a structured format, with rowkey, indexes and way to fetch the data easily.
+Structured data are data you can store in GCP databases such as Spanner, BigTable, SQL or Firestore. Indeed, when storing those data, you transform the unstructured input into a structured format, with rowkey, indexes and way to fetch the data easily.
 
-Unstructured data are all data that are basically in a binary file, which can not be queried immediatly. Cloud Storage is a perfec fit to store unstructured data, but their usage is limited.
+Unstructured data are all data that are basically in a binary file, which can not be queried immediatly. Cloud Storage is a perfect fit to store unstructured data, but their usage are limited.
 
-To transform unstructured data to structured data, you can use an ETL, such as Cloud Datapred, or Cloud DataFlow, or using an HBase cluster (provided by GCP) to transform the input data.
+To transform unstructured data to structured data, you can use an ETL, such as Cloud Dataprep, or Cloud DataFlow, or using an HBase cluster (provided by GCP) to transform the input data.
 
 ##### Strong vs. eventual consistency
 
@@ -512,12 +511,12 @@ Regarding the Database service you are using, some guaranty Strong consistency o
 * Spanner: ACI++D transaction -> Strong consistency. I++ because: 
     * Isolation level is SERIALIZABLE READS (no phantom reads) for a transaction (reads-only or reads-writes)
 * SQL: ACID transaction -> Strong consistency
-* Firestore: ACID transactio with Isolation level at SERIALIZABLE READS -> Strong consistency
+* Firestore: ACID transaction with Isolation level at SERIALIZABLE READS -> Strong consistency
 * BigTable: By default it uses eventual consistency: A write made in one cluster is eventually persisted to the others.
-    * But for some cases, you can enforce a read-your-writes consistency, but you loses replication across regions for such specific data. This is configured for a group of application. Not all your applications might need a read-your-writes consistency
-    * An even enforces Strong consistency for all of your applications by configuring a single-router routing (and one failover, but it is just a failover, not an available replicas to use in the workloads)
+    * But for some cases, you can enforce a read-your-writes consistency, but you lose replication across regions for such specific data. This is configured for a group of application. Not all your applications might need a read-your-writes consistency
+    * And even enforces Strong consistency for all of your applications by configuring a single-router routing (and one failover, but it is just a failover, not an available replicas to use in the workloads)
 
-* Storage: Some operation are guarantied Strongly consistency, some others (like changing IAM permission on an object) are eventually consistent.
+* Storage: Some operations are guarantied Strongly consistency, some others (like changing IAM permission on an object) are eventually consistent.
     * Strongly consistent operations:
         * Read-after-write
         * Read-after-metadata-update
@@ -527,20 +526,19 @@ Regarding the Database service you are using, some guaranty Strong consistency o
     * Eventually consistent operation:
         * Granting access to or revoking access from resources.
 
-
 ##### Data volume
 
-High volume of data are better handled by Cloud BigTable, Cloud Spanner and Cloud Storage. If you respect the best practices in term of shema, rowkey definition, indexes... you could create application that supports high volume traffic.
+High volume of data are better handled by Cloud BigTable, Cloud Spanner and Cloud Storage. If you respect the best practices in term of schema, rowkey definition, indexes... you could create application that supports high volume traffic.
 
-Cloud SQL and Firestore are less usable for high volumes traffic. For instance, Firestore supports high reads, but low writes (1s per entity max) and Cloud SQL, well it is Cloud SQL.
+Cloud SQL and Firestore are less usable for high volumes traffic. For instance, Firestore supports high reads, but low writes (1s per entity max) and Cloud SQL, well it is basic SQL (MySQL, PostgreSQL, SQLServer)
 
 ##### Frequency of data access in Cloud Storage
 
 Cloud storage provided 4 storage classes:
 * Standard Storage: Data are accessed frequently. No retention policy by default. Very low access fees, Very high storage fees
 * Nearline Storage: Data are accessed on a monthly basis. 30 days retention. Low access fees, High storage fees
-* Coldline Storage: Data are accessed on a trimestrial basis. 90 days retention. High access fees, low storage fees
-* Archive Storage. Data are accessed on a annual bais. 365 days retention. Very high access fees, very low storage fees
+* Coldline Storage: Data are accessed on a quarter basis. 90 days retention. High access fees, low storage fees
+* Archive Storage. Data are accessed on an annual basis. 365 days retention. Very high access fees, very low storage fees
 
 #### Google-recommended practices and documentation
 
@@ -548,21 +546,21 @@ Cloud storage provided 4 storage classes:
 
 #### Using managed services
 
-As much as possible, it is always recommended to use Managed services. By using them, you enjoy the experiences of many years on may projects for your application. If you need a database, don't use a PostgreSQL started on a Compute engine you manage yourself. Use Cloud SQL. You need a messaging system, choose PubSub. Data storage, use a Storage service...
+As much as possible, it is always recommended to use Managed services. By using them, you enjoy the experiences of many years on many projects for your application. If you need a database, don't use a PostgreSQL started on a Compute engine you manage yourself. Use Cloud SQL. You need a messaging system, choose PubSub. Data storage, use a Storage service...
 
 If you do not, you might have to think about all the implications of not doing so, like resiliency, availability, backup...
 
 #### Refactoring a monolith to microservices
 
-Refactoring a monolith application to a microservices application should never be taken lightly. These decision will impact your entire application on subjects you never imagined before... Indeed, having the comfort of working in an ACID environment is the most comfortable...
+Refactoring a monolith application to a microservices application should never be taken lightly. These decision will impact your entire application on subjects you never imagined before... Indeed, working in an ACID environment is a very comfortable place to be...
 
 Besides, you will never be able to move all at once. It is mandatory to move parts after parts, gain experiences with the first API migration, and then move on to the next step.
 
 So, you have to move step by step... Starts by creating an API gateway... The gateway will intercept the call, and then redirects it to the monolith. Once it is working properly and stable, then extract an endpoint and then change the gateway to send those specific request to the new microservices...
 
-Besides, you will also have to think scalability: How yous system will evolve under load peaks ? With a monolith, it is more likely you will perform a vertical scalability: having a more powerful system. With microservices, you can think in terms of horizontal scalability.
+Besides, you will also have to think scalability: How your system will evolve under load peaks ? With a monolith, it is more likely you will perform a vertical scalability: having a more powerful system. With microservices, you can think in terms of horizontal scalability.
 
-And then comes the questions about databases, where you can choose more accuratly system that best fits your needs in term of data storage.
+And then comes the questions about databases, where you can choose more accurately system that best fits your needs in term of data storage.
 
 When talking about communication, you might need now a Pubsub system for async command, or using HTTP request for sync query... So you need to think in term of latency, throughput, Correlation ID...
 
@@ -570,12 +568,15 @@ And even more consideration
  
 #### Designing stateless, horizontally scalable services
 
-Stateless is becoming the new standard when developing REST API. The sessions are no longer managed on server side, which is one factor that makes horizontal scalability difficult to apply. Instead, it is delegating to the client, using Cookies, and any server can handles the client request. This makes the system more scalable.
+Stateless is becoming the new standard when developing REST API. The sessions are no longer managed on server side, which is one factor that makes horizontal scalability difficult to apply. Instead, it is delegated to the client, using Cookies, and any server can handle the client request. This makes the system more scalable.
 
-But, in some cases, you might need session management. If it the cases, you couls use solution like MemoreStore to very quickly retrieve the client session for instance.
+But, in some cases, you might need session management. If it the cases, you could use solution like MemoryStore to very quickly retrieve the client session for instance.
  
 #### Google-recommended practices and documentation
 
+* No session
+* Microservices development
+* Managed services as much as possible
 
 ## Section 2: Building and testing applications
 
@@ -595,7 +596,7 @@ To start an emulator, you can use:
 ```shell script
 gcloud beta emulators GROUP COMMAND
 ```
-With GROUP being one of the service listed above. COMMAND being specific to the GROUP specified.
+With GROUP being one of the service listed above. COMMAND being specific to the GROUP.
 
 ```
 gcloud beta emulators datastore start
@@ -603,14 +604,14 @@ gcloud beta emulators datastore start
 
 #### Creating Google Cloud projects
 
-Projects are the main resource you will need in GCP. Every resources you create are linked to a project. Do not be afraid of creating and deleting projects, are the fees only apply for services you create in the project.
+Projects are the main resource you will need in GCP. Every resource you create are linked to a project. Do not be afraid of creating and deleting projects, are the fees only apply for services you create in the project.
 
 To create project, you can either use the GCP console (only web application: https://console.cloud.google.com), or use the `gcloud` tool
 ```shell script
 gcloud projects create PROJECT_NAME --set-as-default
 ```
 
-Consider then two things about your project: the name and the ID. If the name is unique, then it will also be the ID. If it is not, then il will create a different ID. The ID is unique name of your project, and must be used to know on whch GCP project the resource needs to be created. 
+Consider then two things about your project: the name and the ID. If the name is unique, then it will also be the ID. If it is not, then il will create a different ID. The ID is the unique name of your project, and must be used to know on which GCP project the resource needs to be created. 
 
 #### Using the command-line interface (CLI), Google Cloud Console, and Cloud Shell tools
 
@@ -622,7 +623,7 @@ With the WebApp, you have access to Cloud Shell, a virtual environment with the 
 The Cloud shell :
 * is executed on a Compute Engine instance (Debian based Linux OS).
 * Data inside the Compute engine is persisted, but lost after 1hours of inactivity.
-* %Go of free persistent storage mounted as $HOME.
+* 5Go of free persistent storage mounted as $HOME.
 * Storage per user, cross project.
 * This storage does not timeout, unlike the instance itself. (only $HOME)
 * Full documentation: https://cloud.google.com/shell/docs/how-cloud-shell-works
@@ -649,7 +650,7 @@ Writing algorithm should be done carefully, It is easy to solve a problem, it is
 * Tree analysis
 * Heap..
 
-Besides, one the most common notation to analyse an algoritm is O(n).
+Besides, one the most common notation to analyse an algorithm is O(n).
 * O(n) which means the algorithm will evolve in a linear way given the input data size, like standard array iteration
 * O(1) which indicates the algorithm will always take the same time, no matter the input data. Usually, to reach a O(1), you need to compromise with memory footprints by using a Map for instance. You reduce the time needed by increasing the memory footprint.
 * O(nlogn): when you sort an array, it is always O(nlogn). Which means the more input data you have, wider the gap will be between two execution N and N+1
@@ -658,7 +659,7 @@ Besides, one the most common notation to analyse an algoritm is O(n).
 #### Modern application patterns
 
 In the Cloud, Microservices is the main modern application pattern. You split your services with well defined responsabilities to ensure the success of your use cases.
-Those services will communicate with one another using HTTP request, or sending async message. The major difficulties with microservices is to find a proper split. And of course, there is no single solution. One very known anti-pattern is to split the services by technical consideration, which diminushes the horizontal scalability possibilities.
+Those services will communicate with one another using HTTP request, or sending async message. The major difficulties with microservices is to find a proper split. And of course, there is no single solution. One very known anti-pattern is to split the services by technical consideration, which diminishes the horizontal scalability possibilities.
 
 To split properly the microservices, the usage of strategic DDD could be helpful in order to find natural boundaries between microservices, and avoiding the pattern of putting every new code in a new microservices.
 
@@ -666,18 +667,18 @@ You also find the classic 3 tiers application: Frontend, backend and Database.
 This approach is very common the layering architecture inside an application: Controller / Service / Infrastructure.
 
 Nowadays, when applicable, we hear a lot about DDD application: 
-* Hexagonal architecture, with Primary/driving adapters (left side) and Secondary/Driven adapaters (right side). (https://alistair.cockburn.us/hexagonal-architecture/)
+* Hexagonal architecture, with Primary/driving adapters (left side) and Secondary/Driven adapters (right side). (https://alistair.cockburn.us/hexagonal-architecture/)
 * Exposition layer
 * Infrastructure Layer
 * Application layer
 * Domain Layer
-* The overall idea is to easily change a technical implementation, like database accessm pubsub system for another one, without impacting the business (domain layer) code.
+* The overall idea is to easily change a technical implementation, like database access, pubsub system for another one, without impacting the business (domain layer) code.
 
 Of course, with GCP, the micro services pattern with each services its own storage service is more than encourages, in order to facilitate scalability of your application.
 
 #### Software development methodologies
 
-Agile methoologies are famous currently to build a software:
+Agile methodologies are famous currently to build a software:
 * Developers and clients proximity
 * Constant communication with the clients
 * Features Priorization
@@ -697,15 +698,15 @@ XP practices come back into play more and more. To develop application with qual
 * TDD: Test Driven Development. Guide your development with Step by step test that helps you build your application
 * ATDD: Acceptance TDD: Starts with an acceptance (i.e sometimes user) tests to keep in mind the end result you expect, and build your algorithm steps by steps using TDD.
 * Code review: before merging code, you make sure the code is correct regarding your team shared practices (code readability, testability, naming convention...)
-* Sources management tool: Do not even think of developing without Git (or equivalent... bt I don't know them). That is a great tool to centralize the code bases with tagging, commit, branch management...
+* Sources management tool: Do not even think of developing without Git (or equivalent... SVN, CSV... Kidding ;)). That is a great tool to centralize the code bases with tagging, commit, branch management...
     * Sources repositories is the GCP service to manage your source code. It can be sync with Github if you prefer to keep your sources there.
 * CI/CD : To shorten the feedback loop of your development, and to send a story in production quickly, you need to create a Continuous Integration or Deployment pipeline. This pipeline will run tests automatically and deploy application on the environment.
     * Cloud Build is the GCP service to let you create your CI/CD pipeline
-* and even more, but I think those are the main ones. 
+* And even more, but I think those are the main ones. 
 
 #### Debugging and profiling code
 
-Debugging an application is part of the developer life. When an error occured, and it will, you need to be able to debug the application. You can not debug in production, as it will stop the application for the end users, not possible ^^. But you could reproduce the bug locally if possible. If not, you can use the Debugger tool of GCP to take hot snapshot of your application. giving you the ability to understand what happens in your code.
+Debugging an application is part of the developer life. When an error occurs, and it will, you need to be able to debug the application. You can not debug in production, as it will stop the application for the end users, not possible ^^. But you could reproduce the bug locally if possible. If not, you can use the Debugger tool of GCP to take hot snapshot of your application, giving you the ability to understand what happens in your code.
 
 Profiling code helps to understand where you have low performace. Does a method take more times than others ? How long before ending the code. Great profiling tool is very important to understand what causes a latency for a client. GCP provides Profiling, a tool to profile your application on production. If you do not have such tool, you endup monitoring your application with timer inside your application, which makes your profiling harder to analyse.
 
@@ -715,15 +716,15 @@ Profiling code helps to understand where you have low performace. Does a method 
 
 #### Unit testing
 
-Unit test are very fast, specific test of your application. Their purpose is to test a unit of functionality. They can span multiple classes, as long as it is still testing the same unit of functionality.
+Unit tests are very fast, specific test of your application. Their purpose are to test a unit of functionality. They can span multiple classes, as long as it is still testing the same unit of functionality.
 
 In a Unit test, you can mock dependencies to external services, like calling an API or something.
 
-A unit test must not leave your memory or go through the network in order to stay fast, and independant from the environment.
+A unit test must not leave your memory or go through the network in order to stay fast, and independent from the environment.
 
 When developing using the DDD patterns, you have to unit test a lot your domain layer. This is critical, in order to quickly adapt and resolve in case of a bug after a code change... 
 
-You really need to rely a lot on unit test, and integration tests, which are much slower,and does not gives you a feedback as fast as possible.
+You really need to rely a lot on unit tests, as integration tests are much slower, and does not gives you a feedback as fast as possible.
 
 #### Integration testing
 
@@ -731,12 +732,12 @@ Integration tests are tests that test a group of functionality together. They ar
 
 #### Performance testing
 
-PPerformance testing, a non-functional testing technique performed to determine the system parameters in terms of responsiveness and stability under various workload. Performance testing measures the quality attributes of the system, such as scalability, reliability and resource usage.
+Performance testing, a non-functional testing technique performed to determine the system parameters in terms of responsiveness and stability under various workload. Performance testing measures the quality attributes of the system, such as scalability, reliability and resource usage.
 
 To have an efficient performance test session, you need to know first what metrics you want to capture. Are you checking throughput, latency, resiliency, Availability ? 
 
 You find different subsets of performance testing, like: 
-* Load testing
+* Load testing: Gradually improve the charge to see how the application handles the load.
 * Stress testing: It is performed to find the upper limit capacity of the system and also to determine how the system performs if the current load goes well above the expected maximum.
 * Soak testing: Soak Testing also known as endurance testing, is performed to determine the system parameters under continuous expected load. During soak tests the parameters such as memory utilization is monitored to detect memory leaks or other performance issues. The main aim is to discover the system's performance under sustained use.
 * Spike testing: Spike testing is performed by increasing the number of users suddenly by a very large amount and measuring the performance of the system. The main aim is to determine whether the system will be able to sustain the workload.
@@ -749,11 +750,11 @@ Load testing - It is the simplest form of testing conducted to understand the be
 
 #### Source control management
 
-A source control management is mandatory for any software development. Even if you are a single developers, it is mandatory. When working in teams, it helps the team focusing on development, and provides features like branching, tagging and merging to keep track of the source code. 
+A source control management is mandatory for any software development. Even if you are a single developer, it is mandatory. When working in teams, it helps the team focusing on development, and provides features like branching, tagging and merging to keep track of the source code. 
 
 It also provides history to go back to a previous state if needed.
 
-GCP provides Sources Repositories, an online repositories, like Github, to store team source code. It is based on Git. Source repositories is important when using Monitoring, profiling and debugging of application hosted on GCP. It is also useful to trigger build deployments with Cloud build, when a new branch is pushed for instance. 
+GCP provides Sources Repositories, an online repository, like Github, to store team source code. It is based on Git. Source repositories is important when using Monitoring, Profiling and Debugging of application hosted on GCP. It is also useful to trigger build deployments with Cloud build, when a new branch is pushed for instance. 
 
 A Source repositories can be sync with GitHub or BitBucket if you wish to store your source code in another place.
 
@@ -772,25 +773,25 @@ docker run gcr.io/PROJECT_NAME/my-image:latest
 Choosing a base image must be considered carefully. I recommend:
 * Choose only an official image as a base image, to make sure you do not have unknown vulnerabilities
 * Favor official images also to make sure it will be maintained and evolve over time
-* Try to keep your image as small as possible. So rely only on what is strictly necessaery to run... It not useful to import more than needed, as you might have mure vulnerabilities because of that
+* Try to keep your image as small as possible. So rely only on what is strictly necessary to run... It is not useful to import more than needed, as you might have more vulnerabilities because of that
 
 And to ensure the security of your image, you can security scanner, a GCP service that scans Containers Registry and Artifact Registry.
 
 #### Developing a continuous integration pipeline using services (e.g., Cloud Build, Container Registry) that construct deployment artifacts
 
-To develop a Continuous integration?deployment pipelines, you can use Cloud Build. Cloud Build is a service like CircleCI or TravisCI, providing CI as a service. 
+To develop a Continuous integration/deployment pipelines, you can use Cloud Build. Cloud Build is a service like CircleCI or TravisCI, providing CI as a service. 
 
 You can configure your CI pipeline in a `cloudbuild.yaml` file that respects the Cloud Build format (https://cloud.google.com/cloud-build/docs/build-config?hl=en). You define `steps` that are the task to execute. Tasks are executed in a Docker container. You can specify the Docker image (`name`) for the step depending on the task you have to perform (like maven build, docker push, yarn...).
 
-Every steps shares the same volumes, `/workspace`. This folder is shared among all the steps. So you can build your project in one step and build the Docker image in the other... If you need more than the default volumes, examples, you want to persist the maven local repositories as you need to perform several maven build in the pipeline, you can define your own `volumes`, Cloud Build will persist them. 
+Every step shares the same volumes, `/workspace`. So you can build your project in one step and build the Docker image in the other... If you need more than the default volumes, examples, you want to persist the maven local repositories as you need to perform several maven build in the pipeline, you can define your own `volumes`, Cloud Build will persist them. 
 
 By default, the execution is linear, which means steps are executed after one another, in the order defined in the `cloudbuild.yaml` file. If you need parallelism, you can use `waitFor` with `id` to say, my step will wait only for the step `id` to finish. So here starts a parallel pipeline.
 
 To push images on Containers registry, you define a custom step executing a `docker push`, or you can use the `images` statement (at the same level as `steps`). At the end of the pipeline, Cloud build will automatically push images to the specified hub. 
 
-The purpose of the pipeline is to build your project, executing unit and integration test and then build your artifact. You can go further by executing end-to-end tests after your application has been deployed when you are not deploying `main` for instance... It is up to you.
+The purpose of the pipeline is to build your project, executing unit and integration test and then build your artifact. You can go further by executing end-to-end tests after your application has been deployed when you are not deploying to production for instance... It is up to you.
 
-To make sure you hve a full CI pipeline, you need to use Cloud Trigger (and Source repositories, it is easier). This combination will trigger a build every time a push is made on a branch of your application (on a branch, or on anything you specified in Cloud Trigger). You can use `substitutions` variable in your `cloudbuild.yaml` file to make the most of it. Like using a particular namespace for kube, or a specific service for cloud-run, or running your application with specific EMV variable to connect to a different database depending if you are deploying staging or production...
+To make sure you have a full CI pipeline, you need to use Cloud Trigger (and Source repositories, it is easier). This combination will trigger a build every time a push is made on a branch of your application (on a branch, or on anything you specified in Cloud Trigger). You can use `substitutions` variable in your `cloudbuild.yaml` file to make the most of it. Like using a particular namespace for kube, or a specific service for cloud-run, or running your application with specific EMV variable to connect to a different database depending on if you are deploying staging or production...
 
 * CloudBuild does not support conditional steps yet. So you need to perform that manually with a shell `if`... Not great
 * CloudBuild does not support caching automatically. If you want a cache (like the maven local repository, you need to define it yourself...)
@@ -836,11 +837,11 @@ images:
 
 #### Reviewing and improving continuous integration pipeline efficiency
 
-The quicker the pipeline, the sooner you get a feedback. It is important to manage efficiently your pipeline:
+The quicker the pipeline is, the sooner you get a feedback. It is important to manage efficiently your pipeline:
 * Execute in parallel what can be
 * Make sure you log enough information to understand what went wrong
 * Run your unit and integration tests at least
-* Use cache if needed to avoid downloading many times the same resources
+* Use cache if needed to avoid downloading many times the same resources (maven/yarn dependencies)
 * Use substitutions variables to have a conditional build and deploying within the same project on different services
 
 ## Section 3: Deploying applications
@@ -859,9 +860,9 @@ The quicker the pipeline, the sooner you get a feedback. It is important to mana
 
 #### Blue/green deployments
 * In compute engine, use DNS switch to migrate requests from one load balancer to another
-* * In kubernetes, configure your service to route to the new pods using labels
+* In kubernetes, configure your service to route to the new pods using labels
       * Simple configuration change
-* In app Engine or Cloud run, use the Traffic splitting feature
+* In app Engine or Cloud run, use the Traffic splitting feature (100% Blue 0% Green -> 0% Blue 100% Green )
 
 #### Traffic-splitting deployments
 * In compute engine, configure the load balancer to enable Traffic splitting
@@ -876,7 +877,7 @@ The quicker the pipeline, the sooner you get a feedback. It is important to mana
 #### Canary deployments
 * In compute engine, create a new instance group and add it as a backend in your Loadbalancer
 * In kubernetes, create a pod with the same labels as the existing pods. the service will automatically route a portion of requests to it
-* In App Engine or CLoudRun, use the Traffic splitting feature, and split traffic like 20-80, or 50-50...
+* In App Engine or CloudRun, use the Traffic splitting feature, and split traffic like 20-80, or 50-50...
 
 Basically, for some deployment strategies, you can rely on GCP default tools, it works well. But for some others, you might need the support of a CD tool, like Spinnaker, Tekton or Anthos. The tool you choose will depend on the use case.
 
@@ -890,17 +891,17 @@ Then, once the application runs on your compute engine, you need to configure th
 
 With a Firewall rule, You can then add a LoadBalancer.
 
-But the most efficient way to configure an application is to Instance Managed Group. To do so:
+But the most efficient way to configure an application is to configure an Instance Managed Group. To do so:
 * Define an instance template, that will execute a startup script to install your application
 * Create an instance managed group (even if with only 1 instance) to have the possibilities to add more VM in case of peak loads.
 * Configure a LoadBalancer to dispatch request to the groups
     * Have a Health check to know if your instance is healthy
     
-If you need to install your application manually first, chances are you will need to log into the instance. To do so, you can use the SSH button provided by GCP, or you can also execute SSH from your computer. If you do so, you will need to configure your SSH publick key as an authorized public key to connect to your instance.
+If you need to install your application manually first, chances are you will need to log into the instance. To do so, you can use the SSH button provided by GCP, or you can also execute SSH from your computer. If you do so, you will need to configure your SSH public key as an authorized public key to connect to your instance (either on project level or VM level)
 
 #### Bootstrapping applications
 
-To bootstrap an application, use an Instance template. You can create it from scratch, by specifying any attributes you might need, like boot disk size, disk size, network, network tags (in combinaition with firewall rules).
+To bootstrap an application, use an Instance template. You can create it from scratch, by specifying any attributes you might need, like boot disk size, disk size, network, network tags (in combination with firewall rules).
 
 Or, you could also create a template from a running instance, very handy when you are trying to see of your application will work in such configuration.
 
@@ -922,8 +923,9 @@ You can also set a specific scopes that will be targeted by the instance... I th
 
 An instance records all audit logs. Audit logs are available in the Logs Viewer. A compute engine instances logs 3 types of logs:
 * Admin activity logs: Modification of compute engine metadata or resource. Any API call that creates, deletes, updates or modifies a resource.
-* System event logs: system maintenance on Compute engine resources
+* System event logs: system maintenance on Compute engine resources. Driven by the Google System, not you.
 * Data access logs: Read-only operation on Compute engine resources, like get, list... It logs ADMIN_READ logs, and DATA_READ or DATA_WRITE logs, unlike Cloud Spanner, Storage or BigTable.
+* Policy Denied audit logs: logs when a GCP service denies access to a user or service account
 
 With Stackdriver, you can also have a centralized view and create dashboards about your compute engine resources. For that, you need to install stackdriver agents on your Compute engine instance:
 ```shell script
@@ -941,7 +943,7 @@ sudo apt-get install google-fluentd-catch-all-config-structured
 sudo service google-fluentd start
 ```
 
-Those agents extract metrics from your Compute Engine, like CPU usage (even if CPU is available with no agent), memory footprint and other information. You can create dashboard in StackDriver to monitor your VM and set up some uptime check and altering policy based on some metrics (CPU usage and other...).
+These agents extract metrics from your Compute Engine, like CPU usage (even if CPU is available with no agent), memory footprint and other information. You can create dashboard in StackDriver to monitor your VM and set up some uptime check and alert policy based on some metrics (CPU usage and other...). You can also create alert policy based on logs, like if your VM has a deny access to a service, or if you have an error log, or a change in IAM policy..
 
 #### Managing Compute Engine VM images and binaries
 
@@ -962,7 +964,7 @@ LABS:
     * Install the stackdriver agents for logging and monitoring (works also with AWS)
     * Create custom metrics for your VM
     * Create uptime check with alert policy (email, pubsub...)
-    * Create your own cuwtom dashboard with graph and metrics (CPU, Bytes received...)
+    * Create your own custom dashboard with graph and metrics (CPU, Bytes received...)
 * Create an image based on an image disk
 
 
@@ -979,8 +981,8 @@ gcloud container clusters get-credentials quiz-cluster --zone us-central1-b --pr
 ```
 
 Once you are connected to the GKE cluster, you can run `kubernetes` command to deploy your application in the cluster.
-With Kubernetes, you have different options to deploy an application. You can either use
-* `kubectl create -f ./frontend-deployment.yaml` Or `kubectl apply -f ./frontend-deployment.yaml`. This command reads your description file and make sure your cluster and application are configured like the description file. It can update your cluster by only applying and executing the command to go from the curent state to the desired state.
+With Kubernetes, you have different options to deploy an application. You can either use:
+* `kubectl create -f ./frontend-deployment.yaml` Or `kubectl apply -f ./frontend-deployment.yaml`. This command reads your description file and make sure your cluster and application are configured like the description file. It can update your cluster by only applying and executing the command to go from the current state to the desired state.
 * Or you can create and manage your cluster manually with some commands to create what you need
 
 ```shell script
@@ -1022,7 +1024,7 @@ kubectl expose deployment/kubernetes-bootcamp --type="NodePort" --port 8080
 kubectl describe services/kubernetes-bootcamp
 > Describe the service
 
-kubectl label pod $POD_NAME app=v!
+kubectl label pod $POD_NAME app=v1
 > Apply new label to the pod
 > Pod can be changed by service or deployment
 
@@ -1068,7 +1070,7 @@ In GCP, you can manage user access to a project resources by granting roles. Rol
 ##### IAM + RBAC
 
 With GKE, instead of having 2 authentications system, RBAC and IAM, IAM and RBAC are integrated together.
-To authenticate to a GKE cluser, use the command: 
+To authenticate to a GKE cluster, use the command: 
 ```shell script
 gcloud container clusters get-credentials quiz-cluster --zone us-central1-b --project <Project-ID>
 ```
@@ -1096,11 +1098,12 @@ kubectl create clusterrolebinding clusterrolebinding-name \
 
 Namespaces are really important when multiple users and teams are working on the same cluster. It allows to group resource inside a namespace. A name of a resource needs to be unique inside a namespace, but not across. 
 
-It enables also to divide the cluster per users and define resource quotqs.
+It enables also to divide the cluster per users and define resource quotas.
 ```
 kubectl config set-context --current --namespace=<insert-namespace-name-here>
 > Specify the default namespace you use in your cluster
 ```
+
 #### Defining workload specifications (e.g., resource requirements)
 
 It is considered a bad practice to run Kube containers without any limits or request restrictions. 
@@ -1113,7 +1116,7 @@ spec.containers[].resources.requests.memory
 
 If you apply a limit, then Kubelet will enforce this limitation, and make sure the container does not consume more. If you apply a request, then Kubelet will let the container use more memory if the Node can provides more resources.
 
-The most commons resource type you can put limitation on are: CPU and Memory (RAM).
+The most common resource type you can put limitation on are: CPU and Memory (RAM).
 
 * CPU: represents a unit of processing and are specified in units of Kubernetes units. In the Cloud, 1 CPU is equivalent to 1vCPU/Core.
     * You can set value below 1. like 0.1 to have 100m (one hundred milliscpu) for your container
@@ -1151,7 +1154,7 @@ spec:
 
 #### Building a container image using Cloud Build
 
-To build a container image Container registry, you can use Cloud Build. This services provides a way to easily execute a `Dockerfile` file and send the created image to Container Registry.
+To build a container image Container registry, you can use Cloud Build. This service provides a way to easily execute a `Dockerfile` file and send the created image to Container Registry.
 
 Here is the command to create an image from a Dockerfile:
 ```shell script
@@ -1163,8 +1166,8 @@ gcloud builds submit -t gcr.io/$DEVSHELL_PROJECT_ID/quiz-frontend ./frontend/
 
 #### Configuring application accessibility to user traffic and other services
 
-To expose the application to user, you need to create **Services**. A service exposes a deployment in 4 different ways:
-* ClusterIP: Exposes the service on an internal IP in the cluster. Is not reachable from the outside, only the cluster
+To expose the application to user, you need to create **Service**. A service exposes a deployment in 4 different ways:
+* ClusterIP: Exposes the service on an internal IP in the cluster. Is not reachable from the outside, only inside the cluster
 * NodePort: Exposes the service on the same port of each selected Node in the cluster using NAT. Makes the service accessible from outside the cluster using <NodeIp>:<NodePort>. Superset of ClusterIP.
 * LoadBalancer: Creates an external LoadBalancer in the current cloud (if supported, like GCP) and assigns a fixed, external IP to the service. Superset of NodePost
 * ExternalName: Exposes the service using an arbitrary name (specified by the externalName in the spec) return the CNAME record with the name.
@@ -1176,10 +1179,10 @@ With GKE, when using the `LoadBalancer`, it creates an external HTTP Load Balanc
 A Pod lifecycle is as simple as this:
 * Pending phase: Is waiting for kube to start it. It is either in the scheduling queue, or starting its containers
 * Running phase
-    * All Pods in running phase are managed by kubelet and restarted if the pods it not matching the application requirements (meet the correct number of replicas for instance)
+    * All Pods in running phase are managed by kubelet and restarted if the pod is not matching the application requirements (meet the correct number of replicas for instance)
 * Succeeded or Failed phases depending on whether any container terminated in failure in the Pod
 
-A Pod is an ephemeral resources, that can be disposed at any time. If a Pod needs to migrate to a new Node, the current Pod is deleted and a new one is created. It is important to design them to be stateless, or with volumes configuration if you need.
+A Pod is an ephemeral resource, that can be disposed at any time. If a Pod needs to migrate to a new Node, the current Pod is deleted and a new one is created. It is important to design them to be stateless, or with volumes configuration if you need.
 
 Pod runs Containers. Container states are:
 * Waiting: It is running operations it requires in order to complete start up (pulling container image, applying secret).
@@ -1200,17 +1203,17 @@ Kubernetes is based on:
     * By default, a Pod is private. It can not be accessed from the outside world.
 * As a Pod is an ephemeral instance, it can be restarted. Sometimes, your container can tell to kubelet if it is still okay. Those are the **Probes**:
     * Liveness probe: Whether a container is running. If this probe fails, kubelet kills the container, and the container is subjected to restart policy. Without liveness probe, the default State is success
-    * Readiness probe: Whether the container can handle requests. It the readiness probe fails, the endpoints controller removes the POD's IP address from endpoints of all Services that match the pod.
+    * Readiness probe: Whether the container can handle requests. If the readiness probe fails, the endpoints controller removes the POD's IP address from endpoints of all Services that match the pod.
     * startupProbe: Whether the application within the container is started. If this probe fails, the containers is subjected to restart policy.
 * Probes have different implementation:
     * ExecAction: Executes the specified command inside the container (a shell script). Success if the command response code is 0.
-    * TcpSocketAction: perfomrs a TCP check agains the Pod's IP address. Success if the port is open
-    * HttpGetAction: Performs a Get request against the POd's IP address on a specified port and path. Success if response code is >= 200 and < 400
+    * TcpSocketAction: performs a TCP check againts the Pod's IP address. Success if the port is open
+    * HttpGetAction: Performs a Get request against the Pod's IP address on a specified port and path. Success if response code is >= 200 and < 400
 * **RestartPolicy**:  A container restart policy indicates what are the conditions to restart a container. Possible values are Always (default), OnFailure and Never. It applies to all containers within the POD.
-* **Services**: Abstraction which defines a logical set of Pods and a policy by which to access them. It enables a loose couplng between dependent Pods. Indeed, if your app1 depends on app2, and app2 is deployed across multiple pods, you can't refer to the app2 IP addresses to communicate. Use a Service to expose app2 through a single IP address, and the service will dispatch the request according the policy and pods states.
+* **Services**: Abstraction which defines a logical set of Pods and a policy by which to access them. It enables a loose coupling between dependent Pods. Indeed, if your app1 depends on app2, and app2 is deployed across multiple pods, you can't refer to the app2 IP addresses to communicate. Use a Service to expose app2 through a single IP address, and the service will dispatch the request according the policy and pods states.
     * ClusterIP: Exposes the service on an internal IP in the cluster. Is not reachable from the outside, only the cluster
     * NodePort: Exposes the service on the same port of each selected Node in the cluster using NAT. Makes the service accessible from outside the cluster using <NodeIp>:<NodePort>. Superset of ClusterIP.
-    * LoadBalancer: Creates an external LoadBalancer in the current cloud (if supported, like GCP) and assigns a fixed, external IP to the service. Superset of NodePost
+    * LoadBalancer: Creates an external LoadBalancer in the current cloud (if supported, like GCP) and assigns a fixed, external IP to the service. Superset of NodePort
     * ExternalName: Exposes the service using an arbitrary name (specified by the externalName in the spec) return the CNAME record with the name.
     * To match a set of Pods, services use Labels and selectors. Labels are key/value pair attached to objects.
 * **Scaling**: the purpose of kubernetes is to provide autoscaling behavior for your pods to make sure your application can deliver and handle request even if there is a peak load.
@@ -1255,7 +1258,7 @@ When you want to respond to an event on a bucket:
 * google.storage.object.finalize (default): when an object is successfully written to Storage
 * google.storage.object.delete: When the object is deleted, very handy to manage non-versioning bucket. Works also if a file is overriden
 * google.storage.object.archive: Only used in versioning bucket. Triggered when an old version is archived
-* google.storage.object.metadataUpdate: update when objects metadata are updates
+* google.storage.object.metadataUpdate: update when objects metadata are updated
 
 You can configure a Function to listen for a specific Bucket event.
 > Note: Cloud Functions can only be triggered by Cloud Storage buckets in the same Google Cloud Platform project.
@@ -1327,9 +1330,9 @@ Lastly, you also need to provide a dedicated service account for your Cloud Func
 
 Service accounts are used to authenticate anything that is not a human (a service). You can find service Account on GCE instances, GKE instances and PODS, Cloud Run, AppEngine and Cloud Functions. 
 
-The service account is made to authenticate service to service (like two instances talikng together), or a service talking to a Database.
+The service account is made to authenticate service to service (like two instances talking together), or a service talking to a Database.
 
-The principle of least privileges ensured your service will not have unnecessary access to others services. By default, your instances run with a default account (one for each kind of runners) with the role Editor. Very handy when developing, could be dangerous in production. 
+The principle of least privilege ensured your service will not have unnecessary access to others services. By default, your instances run with a default account (one for each kind of runners) with the role Editor. Very handy when developing, could be dangerous in production. 
 
 #### Downloading and using a service account private key file
 
@@ -1461,7 +1464,7 @@ gsutil cp SOURCE gs://BUCKET/OBJECT
 
 Service discovery is a mechanism to automatically detect and add nodes to a network. This remove the burdens of user configuration of a cluster.
 
-To implement a Service Discovery, you need to access GCP resources metadata (configuration data), for GCE or GKE. Those metadata are IPs addresses for instances, or VM name, or a label...
+To implement a Service Discovery, you need to access GCP resources metadata (configuration data), for GCE or GKE. These metadata are IPs addresses for instances, or VM name, or a label...
 
 When creating a LoadBalancer for a Managed Instance Group, behind the scene, a service discovery is used to handle VM add or removal automatically. To do that, the LoadBalancer and the Instance groups use Health Check to check if an instance is still alive.
 
@@ -1469,50 +1472,375 @@ My guess is that many GCP services queries the GCE/GKE metadata to know there IP
 
 For GKE, the service discovery is handled by Service, where you can target a set of pods based on their label for instance. 
 
-The service registry can be based on label (like labels applied to a GCE instance, like http-server, or database, or background-tasks...). Those labels can be used to filter more specifically what VMS to put behind a LoadBalancer for instance.   
+The service registry can be based on label (like labels applied to a GCE instance, like 'http-server', or 'database', or 'background-tasks'...). These labels can be used to filter more specifically what VMs to put behind a LoadBalancer for instance.
 
-TODO: READ this: https://cloud.google.com/compute/docs/storing-retrieving-metadata?hl=en
+Useful resources: https://cloud.google.com/compute/docs/storing-retrieving-metadata?hl=en
+
+You can query different kind of metadata:
+* at project level: http://metadata.google.internal/computeMetadata/v1/project/
+* at Instance level: http://metadata.google.internal/computeMetadata/v1/instance/
+
+Please note:
+* for querying metadata using CURL, you absolutly need to add the header `Metadata-Flavor: Google`
+* You can't use a X-forwarded-For header 
+* When querying metadata, you also get the quotas your project is currently assigned
 
 #### Reading instance metadata to obtain application configuration
 
-* Reading
-```
-gcloud compute instances describe to-be-deleted --zone=us-central1-a
+* Reading metadata (project level and instance level)
+```shell script
+gcloud compute project-info describe
+
+gcloud compute instances describe <instance_name> --zone=us-central1-a
+# The zone is optional if you set a default zone in your gcloud config
 ```
 
+* To set a metadata when creating the instance:
+```shell script
+gcloud compute instances create example-instance \
+    --metadata foo=bar
+```
+
+* To set a metadata on a running instance:
+```shell script
+gcloud compute instances add-metadata instance-name \
+      --metadata bread=mayo,cheese=cheddar,lettuce=romaine
+```
+
+* To remove a metadata
+```
+gcloud compute instances remove-metadata instance-name \
+    --keys lettuce
+```
 #### Authenticating users by using OAuth2.0 Web Flow and Identity-Aware Proxy
+
+##### OAuth2
+
+OAuth2 is the industry standard protocol for authorization.
+
+A client wishing access to a protected resources will go through a flow to make sure he can access the protected resource:
+1. The Client makes a request to the Resource Owner, asking if he could access the resource
+2. The Resource Owner responds with an authorization Grant.
+3. The Client uses the authorization Grant to make a request to the Authorization Server
+4. The Authorization Server responds with an access token
+5. The Client requests the Resource Server with the Access token
+6. The resource server responds the resource
+
+##### Identity Aware Proxy
+
+Identity Aware Proxy (IAP) is a proxy that can automatically protect your applications against unauthenticated user. It uses the OAuth2 protocol to ensure the user has access to the resources. IAP works well with:
+* AppEngine or Cloud Run
+* An External Load Balancer
+* An internal Load Balancer
+
+It can not protect the user if it knows the direct VM IP:PORT address to communicate with the VM. Also the same for GKE. IAP will also need a correct firewall configuration to access your compute engine instances.
+
+For a user to gain access to a service, it needs to have the IAP-secured Web App User role.
+
+It is not because you used IAP that it means you can not not secure your apps. You always have to make application authorization, in case an attacker bypasses IAP, or IAP is turned off. To do this, you need to check the signed JWT IAP sends you: https://cloud.google.com/iap/docs/concepts-best-practices.
+
+Be careful with caching also, as a cached request can be served to an unauthenticated user. To avoid this, you can split into different domains, and use `Cache-control: private`.
+
 #### Authenticating to Cloud APIs with Workload Identity
+
+Workload identity is the recommended way to access Google Cloud services from application running on GKE.
+
+Google Cloud APIs are protected for unauthenticated users. By default, an application running on a POD uses a Kubernetes service account. This account is different from Google service account. You can configure the Kubernetes Service account to act as a Google service account in order to execute APIs Calls.
+
+To do this securely, Workload identity introduces the concept of workload identity pool, allowing IAM to trust and understand Kubernetes service account.
+
+The mapping is done for kubernetes service account that share the a name, a namespace name and a workload identity pool. Which means, if your project is hosting applications on different cluster, if the namespace used accross the cluster has the same name, the same GCP service account will be used. This could be inconvenient. When such a use case happens, and you don't want another to have access to a GCP service account, you need to create a new project (because there is only currently one security pool per project).
+
+The advantages if that is the possibility to enforce the principle of least privilege. Create a service account specific for your application, not just for the GKE cluster. 
 
 ### 4.3 Integrating Cloud APIs with applications. Considerations include:
 
 #### Enabling a Cloud API
+
+GCP works with APIs. By default, almost all APIs are disabled, which means you can request them. If you want to do so, consider enabling the API first:
+```
+gcloud services enable cloudbuild.googleapis.com 
+```
+
 #### Making API calls using supported options (e.g., Cloud Client Library, REST API or gRPC, APIs Explorer) taking into consideration:
 ##### Batching requests
+
+Batch API calls to make multiple requests at once. Can be useful for caching offline requests, or for new APIs where you have a lot of data to upload.
+
+To perform a Batch call:
+* Send a request to /batch/api_name/api_version.
+* Set the content type to `multipart/mixed`. You can have nested HTTP request in the main HTTP request 
+* Each HTTP part begins with `Content-Type: application/http`
+
+Request:
+```
+POST /batch/farm/v1 HTTP/1.1
+Authorization: Bearer your_auth_token
+Host: www.googleapis.com
+Content-Type: multipart/mixed; boundary=batch_foobarbaz
+Content-Length: total_content_length
+
+--batch_foobarbaz
+Content-Type: application/http
+Content-ID: <item1:12930812@barnyard.example.com>
+
+GET /farm/v1/animals/pony
+
+--batch_foobarbaz
+Content-Type: application/http
+Content-ID: <item2:12930812@barnyard.example.com>
+
+PUT /farm/v1/animals/sheep
+Content-Type: application/json
+Content-Length: part_content_length
+If-Match: "etag/sheep"
+
+{
+  "animalName": "sheep",
+  "animalAge": "5"
+  "peltColor": "green",
+}
+
+--batch_foobarbaz
+Content-Type: application/http
+Content-ID: <item3:12930812@barnyard.example.com>
+
+GET /farm/v1/animals
+If-None-Match: "etag/animals"
+
+--batch_foobarbaz--
+```
+
+Response:
+```
+HTTP/1.1 200
+Content-Length: response_total_content_length
+Content-Type: multipart/mixed; boundary=batch_foobarbaz
+
+--batch_foobarbaz
+Content-Type: application/http
+Content-ID: <response-item1:12930812@barnyard.example.com>
+
+HTTP/1.1 200 OK
+Content-Type application/json
+Content-Length: response_part_1_content_length
+ETag: "etag/pony"
+
+{
+  "kind": "farm#animal",
+  "etag": "etag/pony",
+  "selfLink": "/farm/v1/animals/pony",
+  "animalName": "pony",
+  "animalAge": 34,
+  "peltColor": "white"
+}
+
+--batch_foobarbaz
+Content-Type: application/http
+Content-ID: <response-item2:12930812@barnyard.example.com>
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+Content-Length: response_part_2_content_length
+ETag: "etag/sheep"
+
+{
+  "kind": "farm#animal",
+  "etag": "etag/sheep",
+  "selfLink": "/farm/v1/animals/sheep",
+  "animalName": "sheep",
+  "animalAge": 5,
+  "peltColor": "green"
+}
+
+--batch_foobarbaz
+Content-Type: application/http
+Content-ID: <response-item3:12930812@barnyard.example.com>
+
+HTTP/1.1 304 Not Modified
+ETag: "etag/animals"
+
+--batch_foobarbaz--
+```
+
 ##### Restricting return data
+
+Restricting return data is quite important for performance issue. If not restricting, you end up having a big request, thats is expensive over the network, and expensive to interpret. Therefor, all your infrastructure suffers from non-restricted data.
+
+Besides, there can be some security issues when not restricting data, like password, or internal secret Identifier...
+
 ##### Paginating results
+
+Pagination is very important. It is a global error not to paginate data that can grow infinitly. There will be a point in time where your data are too big to be queried. Therefor, pagination on server side is great to keep the data small, increasing network and CPU performance.
+
 ##### Caching results
+
+Caching results can greatly improves performance of your application. Instead of targeting the server each time a request is made, a cache (managed by Cloud CDN for instance) is created once and re-used many times. This reduces a lot the latency of the application.
+
+The Cache needs to be properly managed, with duration time and so one...
+
+Can also be great for users with poor internet connection. 
+
 ##### Error handling (e.g., exponential backoff)
+
+There are cases when the server responds with an error. What should you do when it is such a case ? A practice is to retry the request, to make sure it was just an isolated error, with no repercussion. But what if the error keeps happening ? Then what should you do ? Try again like an idiot, to make sure the system will never be able to recover ? 
+
+A solution is to use Exponential backoff, which makes your client retries requesss, but by waiting longer and longer between each calls. This could give time for the server to get back up again, before receiving new calls.
+
 ##### Using service accounts to make Cloud API calls
 
+When using gcloud, the tool is connected to the login you provided. You can authenticate using a service account by doing:
+```shell script
+gcloud auth activate-service-account [ACCOUNT] --key-file=KEY_FILE.json
+```
+* The KEY_FILE is the key file created for your service account.
+
+To create a service account:
+```shell script
+gcloud iam service-accounts create NAME
+gcloud projects add-iam-policy-binding PROJECT_ID --member="serviceAccount:NAME@PROJECT_ID.iam.gserviceaccount.com" --role="roles/owner"
+gcloud iam service-accounts keys create KEY_FILE.json --iam-account=NAME@PROJECT_ID.iam.gserviceaccount.com
+```
+
+You can also reconstitute the JWT token for that service account, and send it over yout HTTP request in the header `Authorization: Bearer $TOKEN`.  Check this out: https://medium.com/@stephen.darling/oauth2-authentication-with-google-cloud-run-700015a092c2
+
+Globally, to authenticate an HTTP request, the service uses the header `Authorization` to identify the owner of the action.
 
 ## Section 5: Managing application performance monitoring
 
 ### 5.1 Managing Compute Engine VMs. Considerations include:
 
 #### Debugging a custom VM image using the serial port
+
+If you use Google provided image, the chances are you will not face problems. If you face them anyway, they might be after the startup. If that is the case, you could connect using SSH to have more information and try to debug.
+
+But if you are using a custom image, the VM instance might to boot. To diagnose this kind of errors, and try to find a solution, you can use a serial port provided by the image. Usually, a Linux image supports 4 ports `/dev/ttyS0-1-2-3`. The serial port is reserved for administation task, like debugging, very technical image manipulation.
+
+By default, the serial port is disabled. You can enable it on project or instance level:
+```shell script
+gcloud compute project-info add-metadata \
+    --metadata serial-port-enable=TRUE
+
+gcloud compute instances add-metadata instance-name \
+    --metadata serial-port-enable=TRUE
+```
+
+And then to connect, you can do:
+```shell script
+gcloud compute connect-to-serial-port instance-name
+```
+
+Please note the `/dev/ttyS0` port is the port used for all systemd output, which can be very verbose. If you don't want your command to be mixed with systemd logs, you can connect on another port:
+```shell script
+gcloud compute connect-to-serial-port instance-name --port 2
+```
+
+If you want to be able to log in your instance with the serial port, your system needs to allow user/password connection. With GCP provided image, the password is disabled, and you need to enable it first, by connecting to your instance and executing:
+```shell script
+gcloud compute ssh instance-name
+sudo passwd $(whoami)
+```
+
+Please note to login using serial port, your project or instance needs to know your SSH public key to authorize the connection. But anyone can connect to the instance if it knows the instance name, the project and the zone. So be careful, and protect your instance using Firewall rules.
+
 #### Diagnosing a failed Compute Engine VM startup
+
+First, you need to know what's going on your instance. So, you can try to log onto the serial port 1 of your booting image, you could receive some information.
+
+For logs access, you can also use Cloud Logging, which gives you auditlogs, activity logs and data logs on your compute engine. Use AuditLogs for compute engine. 
+
+Then, it could also be a mounted disk that fails. Log in to the instance and try to see what could possibly be wrong.
+
 #### Sending logs from a VM to Cloud Logging
+
+To have logs in Cloud logging, you need to :
+* activate the metadata on project or instance level
+```shell script
+gcloud compute project-info add-metadata \
+    --metadata serial-port-logging-enable=true
+
+gcloud compute instances add-metadata INSTANCE_NAME \
+    --metadata serial-port-logging-enable=true
+```
+* to install the Cloud Logging agent on the instance
+```shell script
+curl -sSO https://dl.google.com/cloudagents/add-logging-agent-repo.sh
+sudo bash add-logging-agent-repo.sh
+sudo yum list --showduplicates google-fluentd
+sudo yum install -y google-fluentd
+sudo yum install -y google-fluentd-catch-all-config-structured
+sudo service google-fluentd restart
+```
+
 #### Viewing and analyzing logs
+
+You can access activity logs directly in the Compute engines interface, or you can use Cloud Logging to veiw logs.
+
+Just filter for any GCE instances, or the one you want to check.
+
 #### Inspecting resource utilization over time
+
+Use Stackdriver with Charts to inspect resources utilization over time, like HTTP request access, CPU utilization...
 
 ### 5.2 Managing Google Kubernetes Engine workloads. Considerations include:
 
 #### Configuring logging and monitoring
+
+GKE by default provides Cloud Logging support that sends logs from the different nodes directly to Cloud Logging. You don't need to install the agent.
+
+But, of course, your application needs to respect the container logging policy, which is logging to STDOUT or STDERR.
+
+Then, it always the same thing with Cloud Logging: You can filter for the resources. Here is a useful resource to use for K8S logs:
+```
+resource.type=("k8s_container" OR "container" OR "k8s_cluster" OR "gke_cluster" OR "gke_nodepool" OR "k8s_node")
+```
+
 #### Analyzing container lifecycle events (e.g., CrashLoopBackOff, ImagePullErr)
+
+* CrashLoopBackOff: The container fails to start, or the healthcheck reports an error (other than 2XX response status). The container keeps failing and can never start. Or, the container has started, but has failed later.
+* ImagePullErr: The image can not be pulled to start a container. This could be for many reasons:
+   * the image name is incorrect
+   * The tag is incorrect
+   * What registry are you pulling the image from ?
+   * Permission denied ? 
+
 #### Viewing and analyzing logs
+
+As always, check for Cloud Logging to have more logs. Filter by resources, textPayload, LogName, Severity... You have plenty of choice.
+
+You can access centralized logs with Cloud Logging and the GKE UI, but you can also ask the logs for a specific container with `kubectl`.
+```
+kubectl logs PODS_NAME 
+```
+
 #### Writing and exporting custom metrics
+
+You can create custom metrics, based on some logs for instance, to display the information in a chart on your Stackdriver dashboard. 
+
 #### Using external metrics and corresponding alerts
+
+The custom metrics can then by used to create alerts and send notifications to the notification channel (email, pubsub, slack...)
+
 #### Configuring workload autoscaling
+
+The Cluster autoscaling automatically resizes your number of nodes in your GKE cluster based on the resource requests. If your workloads requires more resources and the current cluster can't give them, the cluster will scale up to meet the new demands. On the other hand, the cluster scales down when the resource request is low.
+
+Be careful, as Cluster autoscaling can remove a compute engine from your cluster, and so kills all running PODs on it. Design your workload to tolerate this kind of interruption.
+
+But, to have a cluster that autoscales, you also need autoscaling for your Deployment. That is managed by Kubectl. 
+
+So sum up, you have 2 levels of autoscaling:
+* GKE and the nodes (compute engine instances)
+* Kubectl and the Pods
+
+You have two autoscaling mode with GKE:
+* Balance: the default one. Autoscales up and down "slowly"
+* Optimize-utilization: More aggressive autoscaling. Scales down as soon as the cluster can be sized down because of resource request. Be careful, this is not ideal for serving workload, and work best for batch workloads.
+
+Your Pods can be autoscaled in two ways:
+* Horizontal: We add more Pods to support the workloads
+* Vertical: GKE analyses your Real PODS memory consumption, and adjust it to have an optimized resource utilization
+    * Please note it does not work well with JVM-based workload as the usage is hidden by the JVM.
 
 ### 5.3 Troubleshooting application performance. Considerations include:
 
