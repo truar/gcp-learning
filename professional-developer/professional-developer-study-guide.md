@@ -1355,11 +1355,11 @@ Reading/Writing from various SQL databases is done by executing an SQL query. Th
 * SELECT query are used to read data.
 * INSERT/UPDATE/DELETE are used to write data
 
-Nowadays, most framework uses an ORM layer so that the object are mapped automatically into a Relational Databases. The most famous one is hibernate, and it is also provided by Spring for a Java Application.
+Nowadays, most framework uses an ORM layer so that the object are mapped automatically into a Relational Database. The most famous one is hibernate, and it is also provided by Spring for a Java Application.
 
 But under the hood, the ORM is simply executing SQL queries.
 
-You can also use a Document oriented databases, like MongoDB, or a Graph databases, like Neo4J... Those stores data differently. Some allow SQL lite query, others only from API call...
+You can also use a Document oriented databases, like MongoDB, or a Graph databases, like Neo4J... Those store data differently. Some allow SQL lite query, others only from API call...
 
 #### Connecting to a data store (e.g., Cloud SQL, Cloud Spanner, Firestore, Cloud Bigtable)
 
@@ -1406,7 +1406,7 @@ It is possible to do that with Firestore in Native mode using its custom RBAC.
 
 ##### Cloud Bigtable 
 
-BigTable supports the HBase API. To connect to BigTable, you need to create a Connection object, and share it accross your thread in your application.
+BigTable supports the HBase API. To connect to BigTable, you need to create a Connection object, and share it across your thread in your application.
 
 You can provide project information in 2 ways to connect to BigTable:
 * include settings in code
@@ -1448,7 +1448,11 @@ For this use case, the application needs to support background actions, in order
 
 When reading a message from a subscription, the application must ACK the correct reception of the message (once again, using the PubSub API). 
 
-Also, for some use cases, PubSub can PUSH a request to an endpoint (which can be protected for a TOKEN of a user account). The endpoint has to respond an HTTP Response. It the request is correct, it sends a code 2XX, ACK the message and telling PubSub not to send it again. Or, 4/5XX in case of error. In this case, PubSub will send the message again.
+Also, for some use cases, PubSub can PUSH a request to an endpoint (which can be protected for a TOKEN of a user account). The endpoint has to respond an HTTP Response. If the request is correct, it sends a code 2XX, ACK the message and telling PubSub not to send it again. Or, 4/5XX in case of error. In this case, PubSub will send the message again.
+
+```shell script
+gcloud pubsub topics publish my-topic --message="hello" --attribute="origin=gcloud-sample,username=gcp"
+```
 
 #### Storing and retrieving objects from Cloud Storage
 
@@ -1476,13 +1480,13 @@ The service registry can be based on label (like labels applied to a GCE instanc
 
 Useful resources: https://cloud.google.com/compute/docs/storing-retrieving-metadata?hl=en
 
-You can query different kind of metadata:
+You can query different kinds of metadata:
 * at project level: http://metadata.google.internal/computeMetadata/v1/project/
 * at Instance level: http://metadata.google.internal/computeMetadata/v1/instance/
 
 Please note:
-* for querying metadata using CURL, you absolutly need to add the header `Metadata-Flavor: Google`
-* You can't use a X-forwarded-For header 
+* for querying metadata using CURL, you absolutely need to add the header `Metadata-Flavor: Google`
+* You can't use the X-forwarded-For header 
 * When querying metadata, you also get the quotas your project is currently assigned
 
 #### Reading instance metadata to obtain application configuration
@@ -1549,7 +1553,7 @@ Google Cloud APIs are protected for unauthenticated users. By default, an applic
 
 To do this securely, Workload identity introduces the concept of workload identity pool, allowing IAM to trust and understand Kubernetes service account.
 
-The mapping is done for kubernetes service account that share the a name, a namespace name and a workload identity pool. Which means, if your project is hosting applications on different cluster, if the namespace used accross the cluster has the same name, the same GCP service account will be used. This could be inconvenient. When such a use case happens, and you don't want another to have access to a GCP service account, you need to create a new project (because there is only currently one security pool per project).
+The mapping is done for kubernetes service account that share a name, a namespace name and a workload identity pool. Which means, if your project is hosting applications on different cluster, if the namespace used across the cluster has the same name, the same GCP service account will be used. This could be inconvenient. When such a use case happens, and you don't want another to have access to a GCP service account, you need to create a new project (because there is only currently one security pool per project).
 
 The advantages if that is the possibility to enforce the principle of least privilege. Create a service account specific for your application, not just for the GKE cluster. 
 
@@ -1665,19 +1669,19 @@ ETag: "etag/animals"
 
 ##### Restricting return data
 
-Restricting return data is quite important for performance issue. If not restricting, you end up having a big request, thats is expensive over the network, and expensive to interpret. Therefor, all your infrastructure suffers from non-restricted data.
+Restricting return data is quite important for performance issue. If not restricting, you end up having a big request, that is expensive over the network, and expensive to interpret. Therefore, all your infrastructure suffers from non-restricted data.
 
 Besides, there can be some security issues when not restricting data, like password, or internal secret Identifier...
 
 ##### Paginating results
 
-Pagination is very important. It is a global error not to paginate data that can grow infinitly. There will be a point in time where your data are too big to be queried. Therefor, pagination on server side is great to keep the data small, increasing network and CPU performance.
+Pagination is very important. It is a global error not to paginate data that can grow infinitely. There will be a point in time where your data are too big to be queried. Therefore, pagination on server side is great to keep the data small, increasing network and CPU performance.
 
 ##### Caching results
 
 Caching results can greatly improves performance of your application. Instead of targeting the server each time a request is made, a cache (managed by Cloud CDN for instance) is created once and re-used many times. This reduces a lot the latency of the application.
 
-The Cache needs to be properly managed, with duration time and so one...
+The Cache needs to be properly managed, with duration time and so on...
 
 Can also be great for users with poor internet connection. 
 
@@ -1685,7 +1689,7 @@ Can also be great for users with poor internet connection.
 
 There are cases when the server responds with an error. What should you do when it is such a case ? A practice is to retry the request, to make sure it was just an isolated error, with no repercussion. But what if the error keeps happening ? Then what should you do ? Try again like an idiot, to make sure the system will never be able to recover ? 
 
-A solution is to use Exponential backoff, which makes your client retries requesss, but by waiting longer and longer between each calls. This could give time for the server to get back up again, before receiving new calls.
+A solution is to use Exponential backoff, which makes your client retries requests, but by waiting longer and longer between each call. This could give time for the server to get back up again, before receiving new calls.
 
 ##### Using service accounts to make Cloud API calls
 
@@ -1702,7 +1706,7 @@ gcloud projects add-iam-policy-binding PROJECT_ID --member="serviceAccount:NAME@
 gcloud iam service-accounts keys create KEY_FILE.json --iam-account=NAME@PROJECT_ID.iam.gserviceaccount.com
 ```
 
-You can also reconstitute the JWT token for that service account, and send it over yout HTTP request in the header `Authorization: Bearer $TOKEN`.  Check this out: https://medium.com/@stephen.darling/oauth2-authentication-with-google-cloud-run-700015a092c2
+You can also reconstitute the JWT token for that service account, and send it over your HTTP request in the header `Authorization: Bearer $TOKEN`.  Check this out: https://medium.com/@stephen.darling/oauth2-authentication-with-google-cloud-run-700015a092c2
 
 Globally, to authenticate an HTTP request, the service uses the header `Authorization` to identify the owner of the action.
 
@@ -1714,7 +1718,7 @@ Globally, to authenticate an HTTP request, the service uses the header `Authoriz
 
 If you use Google provided image, the chances are you will not face problems. If you face them anyway, they might be after the startup. If that is the case, you could connect using SSH to have more information and try to debug.
 
-But if you are using a custom image, the VM instance might to boot. To diagnose this kind of errors, and try to find a solution, you can use a serial port provided by the image. Usually, a Linux image supports 4 ports `/dev/ttyS0-1-2-3`. The serial port is reserved for administation task, like debugging, very technical image manipulation.
+But if you are using a custom image, the VM instance might fail to boot. To diagnose this kind of errors, and try to find a solution, you can use a serial port provided by the image. Usually, a Linux image supports 4 ports `/dev/ttyS0-1-2-3`. The serial port is reserved for admninistation task, like debugging, very technical image manipulation.
 
 By default, the serial port is disabled. You can enable it on project or instance level:
 ```shell script
@@ -1774,7 +1778,7 @@ sudo service google-fluentd restart
 
 #### Viewing and analyzing logs
 
-You can access activity logs directly in the Compute engines interface, or you can use Cloud Logging to veiw logs.
+You can access activity logs directly in the Compute engines interface, or you can use Cloud Logging to view logs.
 
 Just filter for any GCE instances, or the one you want to check.
 
@@ -1845,11 +1849,66 @@ Your Pods can be autoscaled in two ways:
 ### 5.3 Troubleshooting application performance. Considerations include:
 
 #### Creating a monitoring dashboard
+
+With Stakdriver, you can create cross project dashboard with predefined charts based on your GCP services. It is a manageable dashboard where you can create charts and position them on predefined area.
+
 #### Writing custom metrics and creating log-based metrics
+
+Custom metrics are metrics defined by users. They rely on the same element as the built-in Cloud Monitoring metrics use:
+* A set of data points
+* Metric type information, which tells you what the data point represent
+* Monitored-resource information, which tells you where the data points originated.
+
+
+Log-based metrics are metrics define using Cloud Logging. You can create a metric that is a predefined filter for log entries. With this log based metric, you can then define autoscaling, or alert policy based on these logs aggregation for instance...
+
 #### Using Cloud Debugger
+
+Cloud Debugger works with Source Repositories and a Google Agent installed on the different application. By default, App engine provided the Google Agent to be able to use Cloud Debugger. For a Container based application (GKE, Cloud Run) you need to install the agent in the Dockerfile and use some configuration. For GCE, just install the Agent on the GCE instance.
+
+```shell script
+RUN mkdir /opt/cdbg && \
+     wget -qO- https://storage.googleapis.com/cloud-debugger/compute-java/debian-wheezy/cdbg_java_agent_gce.tar.gz \
+     | tar xvz -C /opt/cdbg
+
+java -agentpath:/opt/cdbg/cdbg_java_agent.so -jar ...
+```
+
+Then, you can use Cloud Debugger to :
+* Capture snapshot on production of your code. Like a breakpoint, set where you want to capture the information, and you get a snapshot of the parameters of your method, and other information. 
+* Dynamically add log line that can be found in the Cloud Logging (if configured). Very handy to understand what happens in production if you are missing some logs.
+
 #### Reviewing stack traces for error analysis
+
+With the agent installed, the error are also catched in Error Reporting, where you can analyse the Stacktrace to try to understand and fix the error in your code. You can add notifications on some errors, making sure you are warned when something happens in your application
+
 #### Exporting logs from Google Cloud
+
+Cloud Logging allows you to export the logs. You can create a Sink to export the logs:
+* A Cloud Logging Bucket for log retention (not provided by Cloud Logging)
+* BigQuery dataset for batch analysis
+* Cloud Storage bucket
+* Cloud PubSub for real time analysis of logs
+
 #### Viewing logs in the Google Cloud Console
+
+Using the gcloud tool, you can request the logs of Cloud Logging 
+```
+gcloud logging tail (needs grpc installed)
+gcloud logging logs list (list all logs resources)
+gcloud logging read "projects/truaro-test-gcp/logs/run.googleapis.com%2Fstdout"
+```
+
 #### Reviewing application performance (e.g., Cloud Trace, Prometheus, OpenTelemetry)
+
+Cloud Trace monitors the latency of your application. But you have to install and configure your application (with opencensus dependencies for Java) to trace the request made to your app. 
+
+When using GKE and Istio (or Anthos), by default, the Mixer traces the request between the container. Istio also comes with Promotheus and Telemetry to display the logs and trace on a UI to help you monitor your application.
+
+Istio installs a sidecar container on each PODS to manage the network of your containers. This sidecar proxy also sends request to Mixer to enable a nice dashboard to help you monitor your application.
+
 #### Monitoring and profiling a running application
+
+Install the Cloud Agent (except on AppEngine standard) to store trace and profiling information about your information.
+
 #### Using documentation, forums, and Google Cloud support
