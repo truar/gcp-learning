@@ -1903,6 +1903,9 @@ gcloud logging read "projects/truaro-test-gcp/logs/run.googleapis.com%2Fstdout"
 
 Cloud Trace monitors the latency of your application. But you have to install and configure your application (with opencensus dependencies for Java) to trace the request made to your app. 
 
+Cloud Trace works best with the library OpenTelemetry. But it is not available for every language (like java). For java, you can use OpenCensus to collect metric. (OpenCensus and OpenTracing have merged into telemetry).
+
+
 When using GKE and Istio (or Anthos), by default, the Mixer traces the request between the container. Istio also comes with Promotheus and Telemetry to display the logs and trace on a UI to help you monitor your application.
 
 Istio installs a sidecar container on each PODS to manage the network of your containers. This sidecar proxy also sends request to Mixer to enable a nice dashboard to help you monitor your application.
